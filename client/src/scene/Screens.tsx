@@ -6,6 +6,7 @@ import { level, type LevelScreen } from '../lib/level'
 import { openOverlay } from '../screens/actions'
 import { useScreens } from '../store/screens'
 import { pointerDrag } from './CameraRig'
+import { usePdfSource } from './PdfSource'
 
 export interface ScreenSource {
   texture: THREE.Texture
@@ -118,8 +119,10 @@ export function ScreenPicture({ screen, source }: { screen: LevelScreen; source:
 function ScreenSurface({ screen }: { screen: LevelScreen }) {
   const state = useScreens((s) => s.states[screen.id])
   const track = useScreens((s) => s.video[screen.id])
+  const visible = useScreens((s) => !!s.visible[screen.id] || s.overlay === screen.id)
   const video = useVideoSource(state?.mode === 'share' ? track : undefined)
-  return <ScreenPicture screen={screen} source={video} />
+  const pdf = usePdfSource(state?.mode === 'pdf' ? state.pdf : null, visible, screen.kind === 'desk' ? 1024 : 2048)
+  return <ScreenPicture screen={screen} source={video ?? pdf} />
 }
 
 export function Screens() {

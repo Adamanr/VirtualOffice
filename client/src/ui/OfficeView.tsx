@@ -13,6 +13,8 @@ import { Interactions } from '../scene/Interactions'
 import { Screens } from '../scene/Screens'
 import { InteractionMenu, InteractionPrompt, ScreenOverlay } from './ScreenUi'
 import '../screens/actions'
+import '../screens/pdfActions'
+import { PdfDropZone, PdfHint, PdfMenuItems, PdfOverlay } from './PdfUi'
 import { navigate } from '../lib/route'
 import { LeaveIcon } from './icons'
 
@@ -57,8 +59,10 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       <VideoTiles />
       <MediaBanners />
       <InteractionPrompt />
-      <InteractionMenu />
-      <ScreenOverlay />
+      <InteractionMenu extra={(id) => <PdfMenuItems screenId={id} />} />
+      <PdfHint />
+      <ScreenOverlay renderPdf={(id) => <PdfOverlay screenId={id} />} />
+      <PdfDropZone />
       <MediaControls>
         <button className="ctl danger" onClick={() => navigate('/')} title="Выйти">
           <LeaveIcon />

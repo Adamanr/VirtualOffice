@@ -37,7 +37,8 @@ defmodule OfficeWeb.Endpoint do
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
   plug Plug.Parsers,
-    parsers: [:urlencoded, :multipart, :json],
+    # PDF presentations up to 50 MB (see OfficeWeb.UploadController).
+    parsers: [:urlencoded, {:multipart, length: 52_000_000}, :json],
     pass: ["*/*"],
     json_decoder: Phoenix.json_library()
 

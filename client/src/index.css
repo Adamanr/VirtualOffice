@@ -126,3 +126,11 @@ kbd { font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12); bo
 .overlay-body { flex: 1; min-height: 0; display: grid; place-items: center; padding: 0 16px 16px; position: relative; }
 .overlay-media { max-width: 100%; max-height: 100%; background: #000; border-radius: 6px; }
 .overlay-empty { color: var(--muted); }
+
+/* PDF */
+.pdf-overlay { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 10px; }
+.pdf-canvas-box { flex: 1; min-height: 0; display: grid; place-items: center; }
+.pdf-canvas { width: auto; height: auto; max-width: 100%; max-height: 100%; background: white; }
+.pdf-controls { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 14px; }
+.pdf-hint { position: absolute; right: 12px; bottom: 14px; padding: 8px 12px; font-size: 13px; z-index: 15; }
+.dropzone { position: absolute; inset: 12px; border: 3px dashed var(--accent); border-radius: 16px; background: rgba(79,140,255,0.12); display: grid; place-items: center; font-size: 20px; font-weight: 600; z-index: 60; pointer-events: none; }

@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { onKey } from '../input/keyboard'
+import { canSeeScreen } from '../lib/audio'
 import { deskSeat, level, zoneAt } from '../lib/level'
 import { openOverlay } from '../screens/actions'
 import { sameTarget, useGame, type Target } from '../store/game'
@@ -43,6 +44,7 @@ export function Interactions() {
     const next = findTarget()
     const { target } = useGame.getState()
     if (!sameTarget(target, next)) useGame.setState({ target: next, menuOpen: false })
+    updateVisibleScreens()
   })
 
   return null
@@ -76,4 +78,18 @@ function findTarget(): Target | null {
     }
   }
   return best
+}
+
+function updateVisibleScreens() {
+  const { x, z } = local.position
+  const me = { x, z, zoneId: zoneAt(level, x, z)?.id ?? null }
+  const { states, visible } = useScreens.getState()
+  const next: Record<string, boolean> = {}
+  for (const id of Object.keys(states)) {
+    const screen = level.screens.find((s) => s.id === id)
+    if (screen && canSeeScreen(me, screen)) next[id] = true
+  }
+  const a = Object.keys(visible)
+  const b = Object.keys(next)
+  if (a.length !== b.length || b.some((id) => !visible[id])) useScreens.setState({ visible: next })
 }

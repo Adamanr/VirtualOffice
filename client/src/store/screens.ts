@@ -9,12 +9,15 @@ interface ScreensState {
   video: Record<string, RemoteVideoTrack | LocalVideoTrack>
   /** Screen shown in the full-window 2D overlay. */
   overlay: string | null
+  /** Screens the local player can currently see (same zone / near a desk monitor). */
+  visible: Record<string, boolean>
 }
 
 export const useScreens = create<ScreensState>(() => ({
   states: {},
   video: {},
   overlay: null,
+  visible: {},
 }))
 
 export function setScreenState(screen: ScreenState) {

@@ -9,5 +9,7 @@ defmodule OfficeWeb.Router do
     pipe_through :api
 
     get "/health", HealthController, :show
+    post "/uploads", UploadController, :create
+    get "/uploads/:name", UploadController, :show
   end
 end

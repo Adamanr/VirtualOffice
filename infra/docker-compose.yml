@@ -6,7 +6,7 @@ name: virtual-office
 
 services:
   livekit:
-    image: livekit/livekit-server:v1.9
+    image: docker.io/livekit/livekit-server:v1.9
     command: ["--config", "/etc/livekit.yaml", "--node-ip", "${LIVEKIT_NODE_IP:-127.0.0.1}"]
     network_mode: host
     environment:

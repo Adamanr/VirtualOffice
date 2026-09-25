@@ -113,3 +113,16 @@ kbd { font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12); bo
 .tile.self video { transform: scaleX(-1); }
 .tile-name { position: absolute; left: 6px; bottom: 6px; display: flex; gap: 4px; align-items: center; font-size: 12px; background: rgba(0,0,0,0.55); padding: 2px 6px; border-radius: 6px; }
 .tile-name svg { width: 12px; height: 12px; color: #ff9a9d; }
+
+/* Interactions */
+.prompt { position: absolute; left: 50%; bottom: 118px; transform: translateX(-50%); padding: 8px 14px; font-size: 14px; z-index: 20; white-space: nowrap; }
+.menu { position: absolute; left: 50%; bottom: 118px; transform: translateX(-50%); padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 280px; z-index: 30; }
+.menu-title { font-weight: 600; margin-bottom: 2px; }
+.menu .btn { text-align: left; }
+
+/* Screen overlay */
+.overlay { position: absolute; inset: 0; background: rgba(5,7,10,0.92); z-index: 50; display: flex; flex-direction: column; }
+.overlay-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; font-size: 14px; }
+.overlay-body { flex: 1; min-height: 0; display: grid; place-items: center; padding: 0 16px 16px; position: relative; }
+.overlay-media { max-width: 100%; max-height: 100%; background: #000; border-radius: 6px; }
+.overlay-empty { color: var(--muted); }

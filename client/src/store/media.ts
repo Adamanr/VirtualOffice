@@ -20,8 +20,6 @@ interface MediaState {
   speaking: Record<string, boolean>
   /** Camera tiles for the HUD: self first, then nearest audible people. */
   tiles: VideoTile[]
-  /** Last user-facing media problem (permission denied, device missing…). */
-  notice: string | null
 }
 
 export const useMedia = create<MediaState>(() => ({
@@ -32,5 +30,4 @@ export const useMedia = create<MediaState>(() => ({
   audioBlocked: false,
   speaking: {},
   tiles: [],
-  notice: null,
 }))

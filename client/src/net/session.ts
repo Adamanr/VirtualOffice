@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { JoinParams } from '@shared/protocol.gen'
 import { local } from '../store/local'
 import { usePlayers } from '../store/players'
+import { useScreens } from '../store/screens'
 import { SpaceConnection } from './connection'
 import { applyBatch, applySnapshot, clearRemotes, clock, remotes, removeRemote } from './remotes'
 
@@ -36,6 +37,7 @@ export function startSession(spaceId: string, profile: Omit<JoinParams, 'playerI
       onJoin: (reply) => {
         clock.sample(reply.serverTime, performance.now())
         applySnapshot(reply.serverTime, reply.players)
+        useScreens.setState({ states: Object.fromEntries(reply.screens.map((sc) => [sc.id, sc])) })
         netFlags.forceSend = true
       },
       onPresence: (entries) => {
@@ -60,4 +62,5 @@ export function stopSession() {
   conn?.close()
   conn = null
   clearRemotes()
+  useScreens.setState({ states: {}, overlay: null })
 }

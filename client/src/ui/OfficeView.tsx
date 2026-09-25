@@ -9,6 +9,10 @@ import { useProfile } from '../store/profile'
 import { HelpHint, TopBar } from './Hud'
 import { MediaBanners, MediaControls, VideoTiles } from './MediaHud'
 import { MediaSync } from '../scene/MediaSync'
+import { Interactions } from '../scene/Interactions'
+import { Screens } from '../scene/Screens'
+import { InteractionMenu, InteractionPrompt, ScreenOverlay } from './ScreenUi'
+import '../screens/actions'
 import { navigate } from '../lib/route'
 import { LeaveIcon } from './icons'
 
@@ -45,11 +49,16 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       <Scene color={color} self={selfId ? <Nameplate id={selfId} /> : null}>
         <NetSync />
         <MediaSync />
+        <Interactions />
+        <Screens />
         <RemotePlayers />
       </Scene>
       <TopBar spaceId={spaceId} />
       <VideoTiles />
       <MediaBanners />
+      <InteractionPrompt />
+      <InteractionMenu />
+      <ScreenOverlay />
       <MediaControls>
         <button className="ctl danger" onClick={() => navigate('/')} title="Выйти">
           <LeaveIcon />

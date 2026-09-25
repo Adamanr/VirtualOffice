@@ -11,6 +11,7 @@ import {
   ScreenSharePresets,
   Track,
   VideoPresets,
+  VideoQuality,
   type LocalTrackPublication,
   type Participant,
 } from 'livekit-client'
@@ -19,6 +20,7 @@ import { getScreen, getZone, level, zoneAt } from '../lib/level'
 import type { SpaceConnection } from '../net/connection'
 import { ProtocolError } from '../net/connection'
 import { remotes } from '../net/remotes'
+import { notify } from '../store/game'
 import { useMedia, type VideoTile } from '../store/media'
 import { useProfile } from '../store/profile'
 import { setScreenVideo, useScreens } from '../store/screens'
@@ -80,7 +82,9 @@ class MediaManager {
     const profile = useProfile.getState()
     const url = reply.url ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/lk`
     const room = new Room({
-      adaptiveStream: true,
+      // Adaptive stream pauses video whose <video> is not visible in the DOM,
+      // which is exactly how VideoTextures are fed; quality is managed manually.
+      adaptiveStream: false,
       dynacast: true,
       webAudioMix: this.audioContext ? { audioContext: this.audioContext } : true,
       audioCaptureDefaults: {
@@ -210,13 +214,14 @@ class MediaManager {
   async setMic(on: boolean) {
     const room = this.room
     if (!room) {
-      useMedia.setState({ micOn: false, notice: on ? 'Медиасервер недоступен' : null })
+      useMedia.setState({ micOn: false })
+      if (on) notify('Медиасервер недоступен')
       return
     }
     try {
       await room.localParticipant.setMicrophoneEnabled(on)
     } catch (e) {
-      useMedia.setState({ notice: `Микрофон: ${describeError(e)}` })
+      notify(`Микрофон: ${describeError(e)}`)
     }
     this.refreshLocal()
   }
@@ -224,13 +229,14 @@ class MediaManager {
   async setCam(on: boolean) {
     const room = this.room
     if (!room) {
-      useMedia.setState({ camOn: false, notice: on ? 'Медиасервер недоступен' : null })
+      useMedia.setState({ camOn: false })
+      if (on) notify('Медиасервер недоступен')
       return
     }
     try {
       await room.localParticipant.setCameraEnabled(on)
     } catch (e) {
-      useMedia.setState({ notice: `Камера: ${describeError(e)}` })
+      notify(`Камера: ${describeError(e)}`)
     }
     this.refreshLocal()
   }
@@ -239,7 +245,7 @@ class MediaManager {
     try {
       await this.room?.switchActiveDevice(kind, deviceId)
     } catch (e) {
-      useMedia.setState({ notice: describeError(e) })
+      notify(describeError(e))
     }
   }
 
@@ -249,19 +255,36 @@ class MediaManager {
     useMedia.setState({ audioBlocked: !(this.room?.canPlaybackAudio ?? true) })
   }
 
-  /** Publishes a screen capture as `screen:<screenId>`. Throws if the user cancels. */
-  async startScreenShare(screenId: string) {
+  /**
+   * Captures the screen (must start inside a user gesture), then runs `claim`
+   * (server-side screen occupancy) and publishes the capture as
+   * `screen:<screenId>`. Throws if the user cancels or the claim fails.
+   */
+  async startScreenShare(screenId: string, claim: () => Promise<unknown>) {
     const room = this.room
     if (!room) throw new Error('Медиасервер недоступен — демонстрация экрана не работает')
+    const tracks = await createLocalScreenTracks({ audio: false, resolution: ScreenSharePresets.h1080fps15.resolution })
+    const video = tracks.find((t): t is LocalVideoTrack => t instanceof LocalVideoTrack)
+    tracks.forEach((t) => t !== video && t.stop())
+    if (!video) throw new Error('Нет видео в захвате экрана')
+    try {
+      await claim()
+    } catch (e) {
+      video.stop()
+      throw e
+    }
     this.stopScreenShare()
-    const [track] = await createLocalScreenTracks({ audio: false, resolution: ScreenSharePresets.h1080fps15.resolution })
-    const video = track as LocalVideoTrack
-    await room.localParticipant.publishTrack(video, {
-      name: SCREEN_TRACK_PREFIX + screenId,
-      source: Track.Source.ScreenShare,
-      simulcast: false,
-      videoEncoding: ScreenSharePresets.h1080fps15.encoding,
-    })
+    try {
+      await room.localParticipant.publishTrack(video, {
+        name: SCREEN_TRACK_PREFIX + screenId,
+        source: Track.Source.ScreenShare,
+        simulcast: false,
+        videoEncoding: ScreenSharePresets.h1080fps15.encoding,
+      })
+    } catch (e) {
+      video.stop()
+      throw e
+    }
     this.screenShare = { screenId, track: video }
     setScreenVideo(screenId, video)
     // The browser's own "Stop sharing" button ends the track.
@@ -327,14 +350,21 @@ class MediaManager {
           const state = screenId ? useScreens.getState().states[screenId] : undefined
           // Only the current owner's share counts (guards against stale publications).
           const want = !!screen && state?.owner === p.identity && (canSeeScreen(listener, screen) || overlay === screenId)
-          if (pub.isDesired !== want) pub.setSubscribed(want)
+          if (pub.isDesired !== want) {
+            pub.setSubscribed(want)
+            if (want) pub.setVideoQuality(VideoQuality.HIGH)
+          }
         }
       }
     }
 
     const shownIds = pickVideoTiles(camCandidates, MAX_TILES - 1)
     const shown = new Set(shownIds)
-    for (const [id, pub] of camPubs) if (pub.isDesired !== shown.has(id)) pub.setSubscribed(shown.has(id))
+    for (const [id, pub] of camPubs) {
+      if (pub.isDesired === shown.has(id)) continue
+      pub.setSubscribed(shown.has(id))
+      if (shown.has(id)) pub.setVideoQuality(VideoQuality.LOW)
+    }
 
     const tiles: VideoTile[] = []
     const localCam = room.localParticipant.getTrackPublication(Track.Source.Camera) as LocalTrackPublication | undefined

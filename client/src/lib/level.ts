@@ -84,3 +84,15 @@ export function rotateXZ(lx: number, lz: number, rotY: number): Vec2 {
   const s = Math.sin(rotY)
   return [lx * c + lz * s, -lx * s + lz * c]
 }
+
+/** Human-readable screen name for menus and overlays. */
+export function screenLabel(screen: LevelScreen): string {
+  if (screen.kind === 'desk') return 'Монитор у стола'
+  return `Экран: ${getZone(screen.zoneId)?.name ?? screen.zoneId}`
+}
+
+/** Where a player sits at a desk (feet position) and which way they face. */
+export function deskSeat(desk: LevelDesk): { x: number; z: number; rotY: number } {
+  const [dx, dz] = rotateXZ(0, -0.75, desk.rotationY)
+  return { x: desk.position[0] + dx, z: desk.position[1] + dz, rotY: desk.rotationY }
+}

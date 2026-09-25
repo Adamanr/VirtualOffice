@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { media } from '../media/media'
+import { useGame } from '../store/game'
 import { useMedia, type VideoTile } from '../store/media'
 import { usePlayers } from '../store/players'
 import { useProfile } from '../store/profile'
@@ -132,10 +133,10 @@ export function MediaControls({ children }: { children?: React.ReactNode }) {
 
 export function MediaBanners() {
   const audioBlocked = useMedia((s) => s.audioBlocked)
-  const notice = useMedia((s) => s.notice)
+  const notice = useGame((s) => s.notice)
   useEffect(() => {
     if (!notice) return
-    const t = setTimeout(() => useMedia.setState({ notice: null }), 5000)
+    const t = setTimeout(() => useGame.setState({ notice: null }), 5000)
     return () => clearTimeout(t)
   }, [notice])
   return (

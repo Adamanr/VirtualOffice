@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { setKeyboardActive } from '../input/keyboard'
 import { startSession, stopSession } from '../net/session'
 import { NetSync } from '../scene/NetSync'
 import { Nameplate } from '../scene/Nameplate'
@@ -33,7 +34,11 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
 
   useEffect(() => {
     startSession(spaceId, { name, color })
-    return () => stopSession()
+    setKeyboardActive(true)
+    return () => {
+      setKeyboardActive(false)
+      stopSession()
+    }
   }, [spaceId, name, color])
 
   if (joinError) {

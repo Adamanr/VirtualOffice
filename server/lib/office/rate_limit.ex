@@ -7,7 +7,8 @@ defmodule Office.RateLimit do
   @type t :: %__MODULE__{rate: number(), burst: number(), tokens: float(), at: integer()}
 
   @spec new(number(), number(), integer()) :: t()
-  def new(rate, burst, now_ms), do: %__MODULE__{rate: rate, burst: burst, tokens: burst / 1, at: now_ms}
+  def new(rate, burst, now_ms),
+    do: %__MODULE__{rate: rate, burst: burst, tokens: burst / 1, at: now_ms}
 
   @spec take(t(), integer(), number()) :: {:ok, t()} | {:error, t()}
   def take(%__MODULE__{} = b, now_ms, cost \\ 1) do

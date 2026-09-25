@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { Anim } from '@shared/protocol.gen'
 
@@ -26,7 +26,9 @@ interface AvatarProps {
 /** Stylized low-poly figure (3 draw calls) with procedural idle/walk/run/sit motion. */
 export function Avatar({ color, getAnim, children }: AvatarProps) {
   const figure = useRef<THREE.Group>(null)
-  const phase = useRef(Math.random() * 10)
+  // Random start phase so idle players don't bob in sync.
+  const [initialPhase] = useState(() => Math.random() * 10)
+  const phase = useRef(initialPhase)
   const material = useMemo(() => bodyMaterial(color), [color])
 
   useFrame((_, dt) => {

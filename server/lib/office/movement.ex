@@ -29,7 +29,8 @@ defmodule Office.Movement do
   Validates `next` against the previous accepted `{state, at_ms}` (or nil).
   Returns `{:ok, state}` or `{:reject, reason}`.
   """
-  @spec check({state(), integer()} | nil, state(), integer(), Level.t()) :: {:ok, state()} | {:reject, atom()}
+  @spec check({state(), integer()} | nil, state(), integer(), Level.t()) ::
+          {:ok, state()} | {:reject, atom()}
   def check(prev, {x, y, z, _r, _a} = next, now_ms, level) do
     cond do
       not Level.in_bounds?(level, x, z) -> {:reject, :out_of_bounds}

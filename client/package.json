@@ -11,7 +11,8 @@
     "gen:protocol": "node scripts/gen-protocol.mjs",
     "gen:protocol:check": "node scripts/gen-protocol.mjs --check",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bots": "node scripts/bots.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

@@ -24,7 +24,8 @@ defmodule OfficeWeb.UploadController do
     end
   end
 
-  def create(conn, _params), do: conn |> put_status(:bad_request) |> json(%{error: "missing_file"})
+  def create(conn, _params),
+    do: conn |> put_status(:bad_request) |> json(%{error: "missing_file"})
 
   def show(conn, %{"name" => name}) do
     path = Path.join(uploads_dir(), name)

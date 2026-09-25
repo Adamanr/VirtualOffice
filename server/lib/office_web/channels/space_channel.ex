@@ -5,7 +5,7 @@ defmodule OfficeWeb.SpaceChannel do
   applied to the space process (Office.Space).
   """
 
-  use OfficeWeb, :channel
+  use Phoenix.Channel, log_handle_in: false
 
   alias Office.{Auth, Chat, Level, LiveKit, Movement, Protocol, RateLimit, Screens, Space}
   alias OfficeWeb.Presence
@@ -41,8 +41,10 @@ defmodule OfficeWeb.SpaceChannel do
       send(self(), :after_join)
 
       {:ok,
-       Map.merge(snapshot, %{self: identity.player_id, serverTime: System.system_time(:millisecond)}),
-       socket}
+       Map.merge(snapshot, %{
+         self: identity.player_id,
+         serverTime: System.system_time(:millisecond)
+       }), socket}
     else
       {:error, reason} -> {:error, %{reason: to_string(reason)}}
     end
@@ -116,7 +118,12 @@ defmodule OfficeWeb.SpaceChannel do
 
       screen ->
         if Screens.can_use?(screen, socket.assigns.zone, position(socket)) do
-          case Space.claim_screen(socket.assigns.space_id, socket.assigns.player_id, screen_id, mode) do
+          case Space.claim_screen(
+                 socket.assigns.space_id,
+                 socket.assigns.player_id,
+                 screen_id,
+                 mode
+               ) do
             {:ok, screen} -> {:reply, {:ok, %{screen: screen}}, socket}
             {:error, reason} -> {:reply, error(reason), socket}
           end
@@ -127,10 +134,17 @@ defmodule OfficeWeb.SpaceChannel do
   end
 
   defp handle_event("screen_release", %{"screenId" => screen_id}, socket) do
-    result(Space.release_screen(socket.assigns.space_id, socket.assigns.player_id, screen_id), socket)
+    result(
+      Space.release_screen(socket.assigns.space_id, socket.assigns.player_id, screen_id),
+      socket
+    )
   end
 
-  defp handle_event("pdf_open", %{"screenId" => id, "url" => url, "name" => name, "pages" => pages}, socket) do
+  defp handle_event(
+         "pdf_open",
+         %{"screenId" => id, "url" => url, "name" => name, "pages" => pages},
+         socket
+       ) do
     if url =~ ~r{\A/api/uploads/[A-Za-z0-9_-]+\.pdf\z} and pages in 1..1000 do
       pdf = %{url: url, name: String.slice(name, 0, 120), pages: pages}
       result(Space.open_pdf(socket.assigns.space_id, socket.assigns.player_id, id, pdf), socket)
@@ -140,7 +154,10 @@ defmodule OfficeWeb.SpaceChannel do
   end
 
   defp handle_event("pdf_page", %{"screenId" => id, "page" => page}, socket) do
-    result(Space.set_pdf_page(socket.assigns.space_id, socket.assigns.player_id, id, page), socket)
+    result(
+      Space.set_pdf_page(socket.assigns.space_id, socket.assigns.player_id, id, page),
+      socket
+    )
   end
 
   defp handle_event("chat_send", %{"scope" => scope, "text" => text}, socket) do

@@ -20,7 +20,11 @@ defmodule OfficeWeb.SpaceChannelTest do
     assert {:error, %{reason: "bad_params"}} =
              OfficeWeb.UserSocket
              |> socket()
-             |> subscribe_and_join(OfficeWeb.SpaceChannel, "space:x", %{"playerId" => "short", "name" => "A", "color" => "#fff"})
+             |> subscribe_and_join(OfficeWeb.SpaceChannel, "space:x", %{
+               "playerId" => "short",
+               "name" => "A",
+               "color" => "#fff"
+             })
   end
 
   test "join returns a snapshot and moves are broadcast in batches" do

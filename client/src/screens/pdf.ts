@@ -78,11 +78,3 @@ export function renderPage(
   }
 }
 
-export async function uploadPdf(file: File): Promise<string> {
-  const body = new FormData()
-  body.append('file', file)
-  const res = await fetch('/api/uploads', { method: 'POST', body })
-  if (!res.ok) throw new Error(res.status === 413 ? 'Файл слишком большой (макс. 50 МБ)' : 'Не удалось загрузить PDF')
-  const { url } = (await res.json()) as { url: string }
-  return url
-}

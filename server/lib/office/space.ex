@@ -24,7 +24,8 @@ defmodule Office.Space do
   @doc "Joins `pid` (a channel process) as `player_id`. Returns a snapshot of the space."
   def join(space_id, player_id, name, pid), do: call(space_id, {:join, player_id, name, pid})
 
-  def move(space_id, player_id, state), do: GenServer.cast(via(space_id), {:move, player_id, state})
+  def move(space_id, player_id, state),
+    do: GenServer.cast(via(space_id), {:move, player_id, state})
 
   def claim_screen(space_id, player_id, screen_id, mode),
     do: call(space_id, {:screen, :claim, player_id, screen_id, mode})
@@ -92,7 +93,13 @@ defmodule Office.Space do
 
       :error ->
         player = %{pid: pid, ref: Process.monitor(pid), name: name, state: nil, dirty: false}
-        state = %{state | players: Map.put(state.players, player_id, player), idle_timer: cancel_idle(state.idle_timer)}
+
+        state = %{
+          state
+          | players: Map.put(state.players, player_id, player),
+            idle_timer: cancel_idle(state.idle_timer)
+        }
+
         {:reply, {:ok, snapshot(state, player_id)}, state}
     end
   end
@@ -123,19 +130,24 @@ defmodule Office.Space do
     {:reply, :ok, %{state | chat: Chat.push(state.chat, msg)}}
   end
 
-  def handle_call({:history, zone}, _from, state), do: {:reply, Chat.history(state.chat, zone), state}
+  def handle_call({:history, zone}, _from, state),
+    do: {:reply, Chat.history(state.chat, zone), state}
 
   @impl true
   def handle_cast({:move, player_id, player_state}, state) do
     case Map.fetch(state.players, player_id) do
-      {:ok, p} -> {:noreply, put_in(state.players[player_id], %{p | state: player_state, dirty: true})}
-      :error -> {:noreply, state}
+      {:ok, p} ->
+        {:noreply, put_in(state.players[player_id], %{p | state: player_state, dirty: true})}
+
+      :error ->
+        {:noreply, state}
     end
   end
 
   @impl true
   def handle_info(:tick, state) do
-    dirty = for {id, %{dirty: true, state: {x, y, z, r, a}}} <- state.players, do: [id, x, y, z, r, a]
+    dirty =
+      for {id, %{dirty: true, state: {x, y, z, r, a}}} <- state.players, do: [id, x, y, z, r, a]
 
     if dirty == [] do
       {:noreply, state}
@@ -167,13 +179,19 @@ defmodule Office.Space do
   defp snapshot(state, self_id) do
     %{
       players:
-        for({id, %{state: s}} <- state.players, id != self_id, s != nil, do: %{id: id, s: Office.Movement.to_list(s)}),
+        for(
+          {id, %{state: s}} <- state.players,
+          id != self_id,
+          s != nil,
+          do: %{id: id, s: Office.Movement.to_list(s)}
+        ),
       screens: Screens.active(state.screens),
       chat: Chat.history(state.chat, nil)
     }
   end
 
-  defp broadcast(state, event, payload), do: OfficeWeb.Endpoint.broadcast(topic(state.id), event, payload)
+  defp broadcast(state, event, payload),
+    do: OfficeWeb.Endpoint.broadcast(topic(state.id), event, payload)
 
   defp schedule_idle(timer) do
     cancel_idle(timer)

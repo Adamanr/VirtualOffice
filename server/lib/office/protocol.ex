@@ -18,16 +18,35 @@ defmodule Office.Protocol do
     |> String.split("|")
     |> Enum.map(&String.trim/1)
     |> Enum.map(fn
-      "string" -> :string
-      "number" -> :number
-      "integer" -> :integer
-      "boolean" -> :boolean
-      "null" -> nil
-      "string[]" -> {:list, :string}
-      "number[]" -> {:list, :number}
-      "integer[]" -> {:list, :integer}
-      "'" <> rest -> {:literal, String.trim_trailing(rest, "'")}
-      other -> raise "Office.Protocol: unsupported client field type #{inspect(other)} in #{@path}"
+      "string" ->
+        :string
+
+      "number" ->
+        :number
+
+      "integer" ->
+        :integer
+
+      "boolean" ->
+        :boolean
+
+      "null" ->
+        nil
+
+      "string[]" ->
+        {:list, :string}
+
+      "number[]" ->
+        {:list, :number}
+
+      "integer[]" ->
+        {:list, :integer}
+
+      "'" <> rest ->
+        {:literal, String.trim_trailing(rest, "'")}
+
+      other ->
+        raise "Office.Protocol: unsupported client field type #{inspect(other)} in #{@path}"
     end)
   end
 

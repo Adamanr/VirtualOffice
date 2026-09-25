@@ -8,7 +8,13 @@ defmodule Office.Level do
 
   defstruct name: nil, bounds: nil, spawn: nil, zones: [], screens: %{}, desks: %{}
 
-  @type zone :: %{id: String.t(), name: String.t(), isolated: boolean(), min: {float, float}, max: {float, float}}
+  @type zone :: %{
+          id: String.t(),
+          name: String.t(),
+          isolated: boolean(),
+          min: {float, float},
+          max: {float, float}
+        }
   @type screen :: %{
           id: String.t(),
           kind: String.t(),
@@ -41,7 +47,13 @@ defmodule Office.Level do
       spawn: xz(map["spawn"]["position"]),
       zones:
         Enum.map(map["zones"], fn z ->
-          %{id: z["id"], name: z["name"], isolated: z["isolated"] == true, min: xz(z["min"]), max: xz(z["max"])}
+          %{
+            id: z["id"],
+            name: z["name"],
+            isolated: z["isolated"] == true,
+            min: xz(z["min"]),
+            max: xz(z["max"])
+          }
         end),
       screens:
         Map.new(map["screens"], fn s ->
@@ -56,7 +68,8 @@ defmodule Office.Level do
              view_distance: s["viewDistance"] && s["viewDistance"] / 1
            }}
         end),
-      desks: Map.new(map["desks"], fn d -> {d["id"], %{id: d["id"], position: xz(d["position"])}} end)
+      desks:
+        Map.new(map["desks"], fn d -> {d["id"], %{id: d["id"], position: xz(d["position"])}} end)
     }
   end
 

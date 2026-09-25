@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getDesk } from '../lib/level'
 import { flipPage, pickPdf, presentPdf } from '../screens/pdfActions'
-import { renderPage } from '../screens/pdf'
+import { renderPage } from '../screens/pdfLazy'
 import { notify, useGame } from '../store/game'
 import { usePlayers } from '../store/players'
 import { useScreens } from '../store/screens'

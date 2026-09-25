@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import type { PdfState } from '@shared/protocol.gen'
-import { renderPage } from '../screens/pdf'
+import { renderPage } from '../screens/pdfLazy'
 import type { ScreenSource } from './Screens'
 
 /** Renders the current PDF page into a CanvasTexture (only while `enabled`, i.e. visible to us). */

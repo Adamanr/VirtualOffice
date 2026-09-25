@@ -3,6 +3,8 @@
  * layout (e.g. Russian ЙЦУКЕН). Ignores keys while typing in inputs.
  */
 const pressed = new Set<string>()
+/** Game keys are only live while the office view is mounted. */
+let active = false
 type Handler = (e: KeyboardEvent) => void
 const handlers = new Map<string, Set<Handler>>()
 const upHandlers = new Map<string, Set<Handler>>()
@@ -14,7 +16,7 @@ export function isTyping(target: EventTarget | null): boolean {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
-    if (isTyping(e.target)) return
+    if (!active || isTyping(e.target)) return
     if (e.code === 'Tab') e.preventDefault()
     const first = !pressed.has(e.code)
     pressed.add(e.code)
@@ -31,7 +33,8 @@ if (typeof window !== 'undefined') {
 
 export const isDown = (code: string) => pressed.has(code)
 
-export function clearKeys() {
+export function setKeyboardActive(value: boolean) {
+  active = value
   pressed.clear()
 }
 

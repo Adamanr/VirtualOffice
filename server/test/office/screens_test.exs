@@ -7,7 +7,9 @@ defmodule Office.ScreensTest do
   end
 
   test "one presenter per screen", %{screens: s} do
-    assert {:ok, s, [%{owner: "alice", mode: "share"}]} = Screens.claim(s, "hall_screen", "alice", "share")
+    assert {:ok, s, [%{owner: "alice", mode: "share"}]} =
+             Screens.claim(s, "hall_screen", "alice", "share")
+
     assert {:error, :busy} = Screens.claim(s, "hall_screen", "bob", "share")
     assert {:error, :unknown_screen} = Screens.claim(s, "nope", "bob", "share")
   end
@@ -22,7 +24,10 @@ defmodule Office.ScreensTest do
   test "claiming another screen releases the previous one", %{screens: s} do
     {:ok, s, _} = Screens.claim(s, "hall_screen", "alice", "share")
     {:ok, s, changed} = Screens.claim(s, "meeting_room_1_screen", "alice", "share")
-    assert [%{id: "hall_screen", owner: nil}, %{id: "meeting_room_1_screen", owner: "alice"}] = changed
+
+    assert [%{id: "hall_screen", owner: nil}, %{id: "meeting_room_1_screen", owner: "alice"}] =
+             changed
+
     assert [%{id: "meeting_room_1_screen"}] = Screens.active(s)
   end
 

@@ -9,7 +9,12 @@ defmodule Office.Screens do
 
   alias Office.Level
 
-  @type screen :: %{id: String.t(), owner: String.t() | nil, mode: String.t() | nil, pdf: map() | nil}
+  @type screen :: %{
+          id: String.t(),
+          owner: String.t() | nil,
+          mode: String.t() | nil,
+          pdf: map() | nil
+        }
   @type t :: %{String.t() => screen()}
 
   # How close to a desk monitor you must stand to present on it.
@@ -21,7 +26,8 @@ defmodule Office.Screens do
   defp empty(id), do: %{id: id, owner: nil, mode: nil, pdf: nil}
 
   @doc "Screens that are in use (the rest are implicitly empty)."
-  def active(screens), do: screens |> Map.values() |> Enum.filter(& &1.owner) |> Enum.sort_by(& &1.id)
+  def active(screens),
+    do: screens |> Map.values() |> Enum.filter(& &1.owner) |> Enum.sort_by(& &1.id)
 
   @spec claim(t(), String.t(), String.t(), String.t()) ::
           {:ok, t(), [screen()]} | {:error, :unknown_screen | :busy}
@@ -41,7 +47,8 @@ defmodule Office.Screens do
     end
   end
 
-  @spec release(t(), String.t(), String.t()) :: {:ok, t(), screen()} | {:error, :unknown_screen | :not_owner}
+  @spec release(t(), String.t(), String.t()) ::
+          {:ok, t(), screen()} | {:error, :unknown_screen | :not_owner}
   def release(screens, id, player) do
     case Map.fetch(screens, id) do
       :error -> {:error, :unknown_screen}
@@ -72,7 +79,8 @@ defmodule Office.Screens do
     end
   end
 
-  @spec set_page(t(), String.t(), String.t(), integer()) :: {:ok, t(), screen()} | {:error, atom()}
+  @spec set_page(t(), String.t(), String.t(), integer()) ::
+          {:ok, t(), screen()} | {:error, atom()}
   def set_page(screens, id, player, page) do
     with {:ok, %{pdf: %{pages: pages} = pdf} = screen} <- owned(screens, id, player) do
       screen = %{screen | pdf: %{pdf | page: page |> max(1) |> min(pages)}}

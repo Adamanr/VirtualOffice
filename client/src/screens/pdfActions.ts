@@ -5,7 +5,7 @@ import { media } from '../media/media'
 import { usePlayers } from '../store/players'
 import { useScreens } from '../store/screens'
 import { explain } from './actions'
-import { countPages, uploadPdf } from './pdf'
+import { countPages, uploadPdf } from './pdfLazy'
 
 export const pdfUpload = { busy: false }
 

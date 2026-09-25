@@ -11,7 +11,7 @@
   "position": [2, 12],
   "rotationY": 3.142
  },
- "wallHeight": 3.2,
+ "wallHeight": 3.6,
  "wallThickness": 0.2,
  "palette": {
   "floor": "#d9d4cb",
@@ -548,9 +548,9 @@
    "id": "hall_screen",
    "kind": "wall",
    "zoneId": "hall",
-   "position": [19.87, 2, -5],
+   "position": [19.87, 2.0, -5],
    "rotationY": -1.571,
-   "size": [6.4, 3.6]
+   "size": [5.6, 3.15]
   }
  ],
  "furniture": [

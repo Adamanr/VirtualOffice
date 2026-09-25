@@ -9,8 +9,11 @@ const livekit = process.env.LIVEKIT_URL ?? 'http://127.0.0.1:7880'
 
 // HTTPS is mandatory in dev too: getUserMedia/getDisplayMedia need a secure
 // context once you open the page from another machine on the LAN.
+// HTTP=1 disables it (http://localhost is still a secure context).
+const https = process.env.HTTP !== '1'
+
 export default defineConfig({
-  plugins: [react(), basicSsl()],
+  plugins: [react(), ...(https ? [basicSsl()] : [])],
   resolve: {
     alias: { '@shared': fileURLToPath(new URL('../shared', import.meta.url)) },
   },

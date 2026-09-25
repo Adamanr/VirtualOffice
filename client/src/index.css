@@ -1,0 +1,16 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --bg: #11151c;
+  --panel: rgba(20, 24, 32, 0.86);
+  --panel-solid: #1a1f29;
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #eef1f6;
+  --muted: #9aa3b2;
+  --accent: #4f8cff;
+  --danger: #e5484d;
+  --ok: #30a46c;
+}
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+button { font: inherit; }

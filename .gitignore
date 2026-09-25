@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+infra/.env
+server/_build/
+server/deps/
+server/*.ez
+server/erl_crash.dump
+server/priv/uploads/
+*.log
+.DS_Store

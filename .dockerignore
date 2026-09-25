@@ -1,0 +1,6 @@
+**/node_modules
+**/dist
+server/_build
+server/deps
+.git
+infra/.env

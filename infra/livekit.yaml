@@ -1,0 +1,20 @@
+# LiveKit SFU config. API keys come from LIVEKIT_KEYS (see docker-compose.yml),
+# the advertised IP from --node-ip (LIVEKIT_NODE_IP in .env).
+port: 7880                # signalling (WebSocket); proxied by Caddy at https://<domain>/lk
+bind_addresses: [""]
+rtc:
+  tcp_port: 7881          # ICE/TCP fallback when UDP is blocked
+  port_range_start: 50000 # ICE/UDP media range; open it in the firewall
+  port_range_end: 60000
+  use_external_ip: false  # we pass --node-ip explicitly
+room:
+  empty_timeout: 300
+  max_participants: 50
+turn:
+  # Embedded TURN over UDP helps clients behind symmetric NAT.
+  # For TURN/TLS on 443 (strict corporate firewalls) see README: it needs a
+  # separate subdomain + certificate.
+  enabled: true
+  udp_port: 3478
+logging:
+  level: info

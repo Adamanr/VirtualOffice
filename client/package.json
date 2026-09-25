@@ -1,0 +1,41 @@
+{
+  "name": "virtual-office-client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run gen:protocol:check && tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "gen:protocol": "node scripts/gen-protocol.mjs",
+    "gen:protocol:check": "node scripts/gen-protocol.mjs --check",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
+    "@react-three/rapier": "^2.2.0",
+    "livekit-client": "^2.22.3",
+    "pdfjs-dist": "^6.3.289",
+    "phoenix": "^1.8.15",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "three": "^0.186.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/phoenix": "^1.6.7",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.2"
+  }
+}

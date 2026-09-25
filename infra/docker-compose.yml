@@ -1,0 +1,57 @@
+# Production-like stack: Caddy (HTTPS, static client, reverse proxy) + Phoenix + LiveKit.
+# All services use host networking: LiveKit needs a large UDP port range
+# (50000-60000) and publishing it through docker-proxy is slow and fragile.
+# Usage: cp .env.example .env && edit && docker compose up -d --build
+name: virtual-office
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.9
+    command: ["--config", "/etc/livekit.yaml", "--node-ip", "${LIVEKIT_NODE_IP:-127.0.0.1}"]
+    network_mode: host
+    environment:
+      # "key: secret" pairs; must match what Phoenix signs tokens with.
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    restart: unless-stopped
+
+  phoenix:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    network_mode: host
+    environment:
+      PHX_SERVER: "true"
+      PHX_HOST: ${DOMAIN}
+      PHX_IP: 127.0.0.1
+      PORT: 4000
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-}
+      LEVEL_PATH: /app/shared/level.json
+      UPLOADS_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
+    restart: unless-stopped
+
+  caddy:
+    build:
+      context: ..
+      dockerfile: infra/caddy.Dockerfile
+    network_mode: host
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [phoenix, livekit]
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  caddy_data:
+  caddy_config:

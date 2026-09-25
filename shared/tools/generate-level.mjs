@@ -56,7 +56,7 @@ add('reception_desk', -0.6, 12.2, FACE_E, { size: [2.4, 0.8] })
 add('chair', -1.45, 12.2, FACE_E)
 add('plant', -0.6, 14.3)
 add('sofa', -19.1, 12.6, FACE_E, { size: [2.4, 0.9] })
-add('coffee_table', -18, 12.6, 0, { size: [0.7, 1.4] })
+add('coffee_table', -17.2, 12.6, 0, { size: [0.7, 1.4] })
 add('bookshelf', -19.72, 0.6, FACE_E, { size: [0.9, 0.35] })
 add('bookshelf', -19.72, 1.6, FACE_E, { size: [0.9, 0.35] })
 add('filing_cabinet', -19.68, 2.5, FACE_E)
@@ -70,6 +70,7 @@ add('filing_cabinet', 0.42, -12.2, FACE_E)
 add('filing_cabinet', 0.42, -11.6, FACE_E)
 add('bulletin_board', 0.12, -8.5, FACE_E, { elevation: 1.6, size: [1.6, 1.0] })
 add('trash_bin', 3.6, -8.4)
+add('fire_alarm', 0.12, -4.4, FACE_E, { elevation: 1.35 })
 add('plant', 3.4, -14.4)
 
 // ── Conference room ─────────────────────────────────────────────────────────────────────────
@@ -94,7 +95,7 @@ add('chair', -5, -11.3, FACE_N)
 add('chair', -5.6, -9.2, FACE_S)
 add('chair', -4.4, -9.2, FACE_S)
 add('sofa', -0.58, -6.2, FACE_W, { size: [2.4, 0.9] })
-add('coffee_table', -1.7, -6.2, 0, { size: [0.7, 1.3] })
+add('coffee_table', -2.5, -6.2, 0, { size: [0.7, 1.3] })
 add('bookshelf', -9.72, -12.6, FACE_E, { size: [0.9, 0.35] })
 add('filing_cabinet', -9.68, -11.7, FACE_E)
 add('filing_cabinet', -9.68, -11.1, FACE_E)
@@ -132,8 +133,9 @@ for (const tx of [9, 13]) {
 add('rug', 17.9, 10.25, 0, { size: [2.4, 5], color: '#8c6d5a' })
 add('sofa', 19.1, 8.6, FACE_W, { size: [2.6, 0.9] })
 add('sofa', 19.1, 11.9, FACE_W, { size: [2.6, 0.9] })
-add('coffee_table', 17.8, 10.25, 0, { size: [0.9, 1.8] })
+add('coffee_table', 16.9, 10.25, 0, { size: [0.9, 1.8] })
 add('bulletin_board', 13, 5.12, FACE_N, { elevation: 1.6, size: [1.8, 1.1] })
+add('fire_alarm', 14.6, 5.12, FACE_N, { elevation: 1.35 })
 add('trash_bin', 15.6, 13.9)
 add('trash_bin', 7.7, 13.9)
 for (const [x, z] of [[19.3, 14.3], [5, 14.3], [19.3, 5.7]]) add('plant', x, z)
@@ -196,6 +198,11 @@ const level = {
     { from: [4, 5], to: [20, 5], doors: [{ at: 16, width: 2 }] },
     { from: [4, 5], to: [4, 15], doors: [{ at: 10, width: 4 }] },
   ],
+  // Office Olympics: paper-basketball / fire-drill scoreboard and the drill assembly point.
+  activities: {
+    scoreboard: { position: [4.12, 1.75, 13.3], rotationY: FACE_E, size: [2.0, 1.25] },
+    assembly: { position: [11, -5], radius: 2 },
+  },
   desks,
   screens,
   furniture,

@@ -8,7 +8,7 @@ defmodule Office.Space do
 
   use GenServer, restart: :transient
 
-  alias Office.{Chat, Level, Screens}
+  alias Office.{Chat, Drill, Level, Props, Scores, Screens, Toss}
 
   @tick_ms 66
   @idle_shutdown_ms 60_000
@@ -22,7 +22,8 @@ defmodule Office.Space do
   def topic(space_id), do: "space:" <> space_id
 
   @doc "Joins `pid` (a channel process) as `player_id`. Returns a snapshot of the space."
-  def join(space_id, player_id, name, pid), do: call(space_id, {:join, player_id, name, pid})
+  def join(space_id, player_id, name, color, pid),
+    do: call(space_id, {:join, player_id, name, color, pid})
 
   def move(space_id, player_id, state),
     do: GenServer.cast(via(space_id), {:move, player_id, state})
@@ -42,6 +43,26 @@ defmodule Office.Space do
   def post_chat(space_id, msg), do: call(space_id, {:chat, msg})
 
   def chat_history(space_id, zone), do: call(space_id, {:history, zone})
+
+  def board_stroke(space_id, player_id, board_id, points, color, width),
+    do: call(space_id, {:board_stroke, player_id, board_id, points, color, width})
+
+  def board_clear(space_id, board_id), do: call(space_id, {:board_clear, board_id})
+
+  def sticker_add(space_id, player_id, board_id, url, x, y, rot),
+    do: call(space_id, {:sticker_add, player_id, board_id, url, x, y, rot})
+
+  def sticker_remove(space_id, board_id, sticker_id),
+    do: call(space_id, {:sticker_remove, board_id, sticker_id})
+
+  def prop_use(space_id, player_id, prop_id, action, item),
+    do: call(space_id, {:prop_use, player_id, prop_id, action, item})
+
+  def toss(space_id, player_id, origin, vel), do: call(space_id, {:toss, player_id, origin, vel})
+
+  def pull_alarm(space_id, player_id), do: call(space_id, {:alarm, player_id})
+
+  def prank(space_id, player_id, desk_id), do: call(space_id, {:prank, player_id, desk_id})
 
   # Starts the space on demand; retries once if it was just shutting down.
   defp call(space_id, msg, retry \\ true) do
@@ -71,13 +92,16 @@ defmodule Office.Space do
        level: level,
        players: %{},
        screens: Screens.new(level),
+       props: Props.new(level),
+       scores: Scores.new(),
+       drill: Drill.new(),
        chat: Chat.new(),
        idle_timer: schedule_idle(nil)
      }}
   end
 
   @impl true
-  def handle_call({:join, player_id, name, pid}, _from, state) do
+  def handle_call({:join, player_id, name, color, pid}, _from, state) do
     max = Application.get_env(:office, :max_players_per_space, 30)
 
     case Map.fetch(state.players, player_id) do
@@ -85,14 +109,21 @@ defmodule Office.Space do
         # Reconnect: the new channel replaces a stale one (e.g. dropped network).
         Process.demonitor(old.ref, [:flush])
         if old.pid != pid, do: send(old.pid, :replaced)
-        player = %{old | pid: pid, ref: Process.monitor(pid), name: name}
+        player = %{old | pid: pid, ref: Process.monitor(pid), name: name, color: color}
         {:reply, {:ok, snapshot(state, player_id)}, put_in(state.players[player_id], player)}
 
       :error when map_size(state.players) >= max ->
         {:reply, {:error, :full}, state}
 
       :error ->
-        player = %{pid: pid, ref: Process.monitor(pid), name: name, state: nil, dirty: false}
+        player = %{
+          pid: pid,
+          ref: Process.monitor(pid),
+          name: name,
+          color: color,
+          state: nil,
+          dirty: false
+        }
 
         state = %{
           state
@@ -133,6 +164,128 @@ defmodule Office.Space do
   def handle_call({:history, zone}, _from, state),
     do: {:reply, Chat.history(state.chat, zone), state}
 
+  def handle_call({:board_stroke, player_id, board_id, points, color, width}, _from, state) do
+    case Props.add_stroke(state.props, state.level, board_id, player_id, points, color, width) do
+      {:ok, props, stroke} ->
+        broadcast(state, "board_stroke", %{stroke: stroke})
+        {:reply, :ok, %{state | props: props}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:board_clear, board_id}, _from, state) do
+    case Props.clear_board(state.props, state.level, board_id) do
+      {:ok, props} ->
+        broadcast(state, "board_clear", %{boardId: board_id})
+        {:reply, :ok, %{state | props: props}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:sticker_add, player_id, board_id, url, x, y, rot}, _from, state) do
+    case Props.add_sticker(state.props, state.level, board_id, player_id, url, x, y, rot) do
+      {:ok, props, stickers} ->
+        broadcast(state, "sticker_update", %{boardId: board_id, stickers: stickers})
+        {:reply, :ok, %{state | props: props}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:sticker_remove, board_id, sticker_id}, _from, state) do
+    case Props.remove_sticker(state.props, state.level, board_id, sticker_id) do
+      {:ok, props, stickers} ->
+        broadcast(state, "sticker_update", %{boardId: board_id, stickers: stickers})
+        {:reply, :ok, %{state | props: props}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:prop_use, player_id, prop_id, action, item}, _from, state) do
+    case Props.use(state.props, state.level, prop_id, player_id, action, item, now()) do
+      {:ok, props, prop, fx} ->
+        broadcast(state, "prop_event", %{prop: prop, fx: fx})
+        {:reply, {:ok, prop}, %{state | props: props}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:toss, player_id, [ox, oy, oz], [vx, vy, vz]}, _from, state) do
+    thrower = Map.fetch!(state.players, player_id)
+
+    others =
+      for {id, %{state: {x, _y, z, _r, _a}}} <- state.players,
+          id != player_id,
+          do: %{id: id, position: {x, z}}
+
+    origin = {ox / 1, oy / 1, oz / 1}
+    vel = {vx / 1, vy / 1, vz / 1}
+    result = Toss.simulate(origin, vel, state.level.bins, others, state.level.bounds)
+
+    toss =
+      Map.merge(result, %{
+        id: Integer.to_string(System.unique_integer([:positive])),
+        by: player_id,
+        origin: Tuple.to_list(origin),
+        vel: Tuple.to_list(vel),
+        t: now()
+      })
+
+    broadcast(state, "toss", %{toss: toss})
+
+    scores =
+      Scores.shot(
+        state.scores,
+        player_id,
+        thrower.name,
+        thrower.color,
+        result.points,
+        result.hit == "player"
+      )
+
+    scores = if result.points == 3, do: Scores.medal(scores, player_id), else: scores
+    broadcast(state, "scores", %{scores: Scores.top(scores)})
+    {:reply, :ok, %{state | scores: scores}}
+  end
+
+  def handle_call({:alarm, player_id}, _from, state) do
+    %{name: name} = Map.fetch!(state.players, player_id)
+
+    case Drill.pull(state.drill, player_id, name, now()) do
+      {:ok, drill} ->
+        broadcast(state, "drill", %{drill: drill})
+        {:reply, :ok, %{state | drill: drill}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:prank, player_id, desk_id}, _from, state) do
+    case Props.toggle_jello(state.props, state.level, desk_id, player_id) do
+      {:ok, props, jello?} ->
+        broadcast(state, "desk_update", %{
+          deskId: desk_id,
+          jello: jello?,
+          by: if(jello?, do: player_id)
+        })
+
+        {:reply, :ok, %{state | props: props}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
   @impl true
   def handle_cast({:move, player_id, player_state}, state) do
     case Map.fetch(state.players, player_id) do
@@ -146,6 +299,8 @@ defmodule Office.Space do
 
   @impl true
   def handle_info(:tick, state) do
+    state = tick_drill(state)
+
     dirty =
       for {id, %{dirty: true, state: {x, y, z, r, a}}} <- state.players, do: [id, x, y, z, r, a]
 
@@ -176,7 +331,38 @@ defmodule Office.Space do
     if state.players == %{}, do: {:stop, :normal, state}, else: {:noreply, state}
   end
 
+  defp tick_drill(%{drill: %{active: false}} = state), do: state
+
+  defp tick_drill(state) do
+    players =
+      Map.new(state.players, fn {id, p} ->
+        pos = with {x, _y, z, _r, _a} <- p.state, do: {x, z}
+        {id, %{name: p.name, position: pos}}
+      end)
+      |> Map.reject(fn {_, p} -> p.position == nil end)
+
+    case Drill.tick(state.drill, players, state.level.assembly, now()) do
+      {:unchanged, drill} ->
+        %{state | drill: drill}
+
+      {:updated, drill} ->
+        broadcast(state, "drill", %{drill: drill})
+        %{state | drill: drill}
+
+      {:finished, drill} ->
+        profiles = Map.new(state.players, fn {id, p} -> {id, %{name: p.name, color: p.color}} end)
+        scores = Scores.drill_results(state.scores, drill.evacuated, profiles)
+        broadcast(state, "drill", %{drill: drill})
+        broadcast(state, "scores", %{scores: Scores.top(scores)})
+        %{state | drill: drill, scores: scores}
+    end
+  end
+
+  defp now, do: System.system_time(:millisecond)
+
   defp snapshot(state, self_id) do
+    props_snap = Props.snapshot(state.props)
+
     %{
       players:
         for(
@@ -186,7 +372,13 @@ defmodule Office.Space do
           do: %{id: id, s: Office.Movement.to_list(s)}
         ),
       screens: Screens.active(state.screens),
-      chat: Chat.history(state.chat, nil)
+      chat: Chat.history(state.chat, nil),
+      boards: props_snap.boards,
+      stickers: props_snap.stickers,
+      props: props_snap.props,
+      jellos: props_snap.jellos,
+      scores: Scores.top(state.scores),
+      drill: state.drill
     }
   end
 

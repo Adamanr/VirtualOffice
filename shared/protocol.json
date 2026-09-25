@@ -3,8 +3,19 @@
   "version": 1,
   "topic": "space:<spaceId>",
   "enums": {
-    "Anim": { "idle": 0, "walk": 1, "run": 2, "sit": 3 },
-    "Emoji": { "thumbsUp": 1, "laugh": 2, "heart": 3, "clap": 4, "raiseHand": 5 }
+    "Anim": {
+      "idle": 0,
+      "walk": 1,
+      "run": 2,
+      "sit": 3
+    },
+    "Emoji": {
+      "thumbsUp": 1,
+      "laugh": 2,
+      "heart": 3,
+      "clap": 4,
+      "raiseHand": 5
+    }
   },
   "types": {
     "PlayerTuple": "[x: number, y: number, z: number, rotY: number, anim: number]",
@@ -41,6 +52,79 @@
     "PlayerSnapshot": {
       "id": "string",
       "s": "PlayerTuple"
+    },
+    "BoardStroke": {
+      "id": "string",
+      "boardId": "string",
+      "from": "string",
+      "points": "number[]",
+      "color": "string",
+      "width": "number"
+    },
+    "Sticker": {
+      "id": "string",
+      "boardId": "string",
+      "url": "string",
+      "x": "number",
+      "y": "number",
+      "rot": "number",
+      "from": "string"
+    },
+    "PropState": {
+      "id": "string",
+      "jammed": "boolean",
+      "lastItem": "string | null",
+      "lastBuyer": "string | null"
+    },
+    "PropFx": {
+      "id": "string",
+      "propId": "string",
+      "by": "string",
+      "action": "string",
+      "outcome": "string",
+      "item": "string | null",
+      "variant": "number",
+      "t": "number"
+    },
+    "Toss": {
+      "id": "string",
+      "by": "string",
+      "origin": "number[]",
+      "vel": "number[]",
+      "t": "number",
+      "flight": "number",
+      "land": "number[]",
+      "hit": "'bin' | 'player' | null",
+      "target": "string | null",
+      "points": "number"
+    },
+    "Score": {
+      "id": "string",
+      "name": "string",
+      "color": "string",
+      "points": "number",
+      "shots": "number",
+      "bonks": "number",
+      "drillMs": "number | null",
+      "medals": "number"
+    },
+    "DrillEntry": {
+      "id": "string",
+      "name": "string",
+      "ms": "number"
+    },
+    "DrillState": {
+      "active": "boolean",
+      "by": "string | null",
+      "byName": "string | null",
+      "startedAt": "number",
+      "endsAt": "number",
+      "cooldownUntil": "number",
+      "evacuated": "DrillEntry[]"
+    },
+    "Jello": {
+      "deskId": "string",
+      "by": "string"
     }
   },
   "join": {
@@ -55,54 +139,205 @@
       "players": "PlayerSnapshot[]",
       "screens": "ScreenState[]",
       "chat": "ChatMessage[]",
+      "boards": "BoardStroke[]",
+      "stickers": "Sticker[]",
+      "props": "PropState[]",
+      "scores": "Score[]",
+      "drill": "DrillState",
+      "jellos": "Jello[]",
       "serverTime": "number"
     },
-    "errors": ["bad_params", "full", "unauthorized"]
+    "errors": [
+      "bad_params",
+      "full",
+      "unauthorized"
+    ]
   },
   "client": {
     "move": {
-      "payload": { "s": "number[]" },
+      "payload": {
+        "s": "number[]"
+      },
       "reply": null
     },
     "media_state": {
-      "payload": { "muted": "boolean", "cam": "boolean" },
+      "payload": {
+        "muted": "boolean",
+        "cam": "boolean"
+      },
       "reply": null
     },
     "livekit_token": {
       "payload": {},
-      "reply": { "token": "string", "url": "string | null", "room": "string" }
+      "reply": {
+        "token": "string",
+        "url": "string | null",
+        "room": "string"
+      }
     },
     "screen_claim": {
-      "payload": { "screenId": "string", "mode": "'share' | 'pdf'" },
-      "reply": { "screen": "ScreenState" }
+      "payload": {
+        "screenId": "string",
+        "mode": "'share' | 'pdf'"
+      },
+      "reply": {
+        "screen": "ScreenState"
+      }
     },
     "screen_release": {
-      "payload": { "screenId": "string" },
+      "payload": {
+        "screenId": "string"
+      },
       "reply": null
     },
     "pdf_open": {
-      "payload": { "screenId": "string", "url": "string", "name": "string", "pages": "integer" },
+      "payload": {
+        "screenId": "string",
+        "url": "string",
+        "name": "string",
+        "pages": "integer"
+      },
       "reply": null
     },
     "pdf_page": {
-      "payload": { "screenId": "string", "page": "integer" },
+      "payload": {
+        "screenId": "string",
+        "page": "integer"
+      },
       "reply": null
     },
     "chat_send": {
-      "payload": { "scope": "'global' | 'zone'", "text": "string" },
+      "payload": {
+        "scope": "'global' | 'zone'",
+        "text": "string"
+      },
       "reply": null
     },
     "react": {
-      "payload": { "emoji": "integer" },
+      "payload": {
+        "emoji": "integer"
+      },
+      "reply": null
+    },
+    "board_stroke": {
+      "payload": {
+        "boardId": "string",
+        "points": "number[]",
+        "color": "string",
+        "width": "number"
+      },
+      "reply": null
+    },
+    "board_clear": {
+      "payload": {
+        "boardId": "string"
+      },
+      "reply": null
+    },
+    "sticker_add": {
+      "payload": {
+        "boardId": "string",
+        "url": "string",
+        "x": "number",
+        "y": "number",
+        "rot": "number"
+      },
+      "reply": null
+    },
+    "sticker_remove": {
+      "payload": {
+        "boardId": "string",
+        "stickerId": "string"
+      },
+      "reply": null
+    },
+    "prop_use": {
+      "payload": {
+        "propId": "string",
+        "action": "'buy' | 'kick' | 'use'",
+        "item?": "string"
+      },
+      "reply": {
+        "prop": "PropState | null"
+      }
+    },
+    "toss": {
+      "payload": {
+        "origin": "number[]",
+        "vel": "number[]"
+      },
+      "reply": null
+    },
+    "alarm_pull": {
+      "payload": {
+        "propId": "string"
+      },
+      "reply": null
+    },
+    "prank": {
+      "payload": {
+        "deskId": "string"
+      },
       "reply": null
     }
   },
   "server": {
-    "batch": { "t": "number", "p": "BatchEntry[]" },
-    "correction": { "s": "PlayerTuple" },
-    "screen_update": { "screen": "ScreenState" },
-    "chat": { "msg": "ChatMessage" },
-    "reaction": { "id": "string", "emoji": "number" }
+    "batch": {
+      "t": "number",
+      "p": "BatchEntry[]"
+    },
+    "correction": {
+      "s": "PlayerTuple"
+    },
+    "screen_update": {
+      "screen": "ScreenState"
+    },
+    "chat": {
+      "msg": "ChatMessage"
+    },
+    "reaction": {
+      "id": "string",
+      "emoji": "number"
+    },
+    "board_stroke": {
+      "stroke": "BoardStroke"
+    },
+    "board_clear": {
+      "boardId": "string"
+    },
+    "sticker_update": {
+      "boardId": "string",
+      "stickers": "Sticker[]"
+    },
+    "prop_event": {
+      "prop": "PropState | null",
+      "fx": "PropFx"
+    },
+    "toss": {
+      "toss": "Toss"
+    },
+    "scores": {
+      "scores": "Score[]"
+    },
+    "drill": {
+      "drill": "DrillState"
+    },
+    "desk_update": {
+      "deskId": "string",
+      "jello": "boolean",
+      "by": "string | null"
+    }
   },
-  "errors": ["bad_payload", "unknown_event", "rate_limited", "busy", "not_owner", "too_far", "unknown_screen", "livekit_disabled"]
+  "errors": [
+    "bad_payload",
+    "unknown_event",
+    "rate_limited",
+    "busy",
+    "not_owner",
+    "too_far",
+    "unknown_screen",
+    "unknown_prop",
+    "livekit_disabled",
+    "cooldown"
+  ]
 }

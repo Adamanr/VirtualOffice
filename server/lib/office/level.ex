@@ -6,7 +6,15 @@ defmodule Office.Level do
   renderer, so zone ids and screen ids always agree on both sides.
   """
 
-  defstruct name: nil, bounds: nil, spawn: nil, zones: [], screens: %{}, desks: %{}
+  defstruct name: nil,
+            bounds: nil,
+            spawn: nil,
+            zones: [],
+            screens: %{},
+            desks: %{},
+            props: %{},
+            bins: [],
+            assembly: nil
 
   @type zone :: %{
           id: String.t(),
@@ -22,9 +30,16 @@ defmodule Office.Level do
           position: {float, float, float},
           view_distance: float | nil
         }
+  @type prop :: %{
+          id: String.t(),
+          type: String.t(),
+          position: {float, float},
+          zone_id: String.t() | nil
+        }
   @type t :: %__MODULE__{}
 
   @key {__MODULE__, :level}
+  @interactive ~w(whiteboard bulletin_board vending_machine coffee_machine water_cooler microwave fridge copier fire_alarm)
 
   @spec load!(Path.t()) :: t()
   def load!(path), do: path |> File.read!() |> Jason.decode!() |> from_map()
@@ -41,20 +56,22 @@ defmodule Office.Level do
 
   @spec from_map(map()) :: t()
   def from_map(map) do
-    %__MODULE__{
+    zones =
+      Enum.map(map["zones"], fn z ->
+        %{
+          id: z["id"],
+          name: z["name"],
+          isolated: z["isolated"] == true,
+          min: xz(z["min"]),
+          max: xz(z["max"])
+        }
+      end)
+
+    level = %__MODULE__{
       name: map["name"],
       bounds: {xz(map["bounds"]["min"]), xz(map["bounds"]["max"])},
       spawn: xz(map["spawn"]["position"]),
-      zones:
-        Enum.map(map["zones"], fn z ->
-          %{
-            id: z["id"],
-            name: z["name"],
-            isolated: z["isolated"] == true,
-            min: xz(z["min"]),
-            max: xz(z["max"])
-          }
-        end),
+      zones: zones,
       screens:
         Map.new(map["screens"], fn s ->
           [x, y, z] = s["position"]
@@ -69,8 +86,38 @@ defmodule Office.Level do
            }}
         end),
       desks:
-        Map.new(map["desks"], fn d -> {d["id"], %{id: d["id"], position: xz(d["position"])}} end)
+        Map.new(map["desks"], fn d -> {d["id"], %{id: d["id"], position: xz(d["position"])}} end),
+      props: %{}
     }
+
+    props =
+      (map["furniture"] || [])
+      |> Enum.with_index()
+      |> Enum.reduce(%{}, fn {f, i}, acc ->
+        type = f["type"]
+
+        if type in @interactive do
+          [x, z] = f["position"]
+          id = "prop_#{i}"
+          zone_id = zone_at(level, x, z)
+          Map.put(acc, id, %{id: id, type: type, position: {x / 1, z / 1}, zone_id: zone_id})
+        else
+          acc
+        end
+      end)
+
+    bins =
+      for {%{"type" => "trash_bin", "position" => [x, z]}, i} <-
+            Enum.with_index(map["furniture"] || []),
+          do: %{id: "bin_#{i}", position: {x / 1, z / 1}}
+
+    assembly =
+      case get_in(map, ["activities", "assembly"]) do
+        %{"position" => pos, "radius" => r} -> %{position: xz(pos), radius: r / 1}
+        _ -> nil
+      end
+
+    %{level | props: props, bins: bins, assembly: assembly}
   end
 
   defp xz([x, z]), do: {x / 1, z / 1}
@@ -88,6 +135,9 @@ defmodule Office.Level do
 
   @spec screen(t(), String.t()) :: screen() | nil
   def screen(%__MODULE__{screens: screens}, id), do: Map.get(screens, id)
+
+  @spec prop(t(), String.t()) :: prop() | nil
+  def prop(%__MODULE__{props: props}, id), do: Map.get(props, id)
 
   @doc "True if the point is inside the level bounds grown by `margin` meters."
   def in_bounds?(%__MODULE__{bounds: {{x0, z0}, {x1, z1}}}, x, z, margin \\ 1.0) do

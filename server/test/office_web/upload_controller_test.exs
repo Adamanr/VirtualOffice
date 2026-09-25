@@ -20,9 +20,25 @@ defmodule OfficeWeb.UploadControllerTest do
     assert get_resp_header(conn, "content-type") |> hd() =~ "application/pdf"
   end
 
-  test "rejects non-PDF files" do
+  test "rejects unsupported files" do
     conn = post(build_conn(), "/api/uploads", %{"file" => upload("<html>")})
-    assert json_response(conn, 422) == %{"error" => "not_a_pdf"}
+    assert json_response(conn, 422) == %{"error" => "unsupported_type"}
+  end
+
+  test "stores a PNG image" do
+    # Minimal 1x1 PNG
+    png =
+      Base.decode64!(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+      )
+
+    path = Path.join(System.tmp_dir!(), "upload-#{System.unique_integer([:positive])}")
+    File.write!(path, png)
+    file = %Plug.Upload{path: path, filename: "x.png", content_type: "image/png"}
+    conn = post(build_conn(), "/api/uploads", %{"file" => file})
+    assert %{"url" => "/api/uploads/" <> name = url} = json_response(conn, 200)
+    assert name =~ ~r/\.png\z/
+    assert get(build_conn(), url) |> response(200) == png
   end
 
   test "does not serve arbitrary paths" do

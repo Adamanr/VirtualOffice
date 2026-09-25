@@ -438,6 +438,12 @@ export function buildLevelGeometry(level: Level): LevelGeometry {
         part('dark', x, z, r, [0, b + 1.25, 0.18], [0.02, 0.25, 0.02])
         collider(x, z, r, [0, b + 0.57, 0], [0.7, 1.14, 0.5])
         break
+      case 'fire_alarm':
+        part('decor', x, z, r, [0, y, 0.035], [0.16, 0.22, 0.07], 'box', '#c8322f')
+        part('white', x, z, r, [0, y - 0.02, 0.072], [0.1, 0.05, 0.02])
+        part('decor', x, z, r, [0, y + 0.07, 0.072], [0.1, 0.03, 0.005], 'box', '#ffffff')
+        part('decor', x, z, r, [0, y + 0.28, 0.06], [0.1, 0.1, 0.12], 'cyl', '#e5484d') // strobe
+        break
       case 'rug':
         part('rug', x, z, r, [0, 0.006, 0], [w, 0.008, d], 'box', item.color ?? '#8c6d5a')
         break

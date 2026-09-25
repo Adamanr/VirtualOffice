@@ -7,7 +7,7 @@ defmodule OfficeWeb.SpaceChannel do
 
   use Phoenix.Channel, log_handle_in: false
 
-  alias Office.{Auth, Chat, Level, LiveKit, Movement, Protocol, RateLimit, Screens, Space}
+  alias Office.{Auth, Chat, Level, LiveKit, Movement, Protocol, RateLimit, Screens, Space, Toss}
   alias OfficeWeb.Presence
 
   intercept ["chat"]
@@ -20,7 +20,8 @@ defmodule OfficeWeb.SpaceChannel do
          {:ok, params} <- Protocol.validate_join(params),
          true <- params["color"] =~ ~r/\A#[0-9a-fA-F]{6}\z/ || {:error, :bad_params},
          {:ok, identity} <- Auth.authorize(params),
-         {:ok, snapshot} <- Space.join(space_id, identity.player_id, identity.name, self()) do
+         {:ok, snapshot} <-
+           Space.join(space_id, identity.player_id, identity.name, params["color"], self()) do
       now = now_ms()
 
       socket =
@@ -180,6 +181,112 @@ defmodule OfficeWeb.SpaceChannel do
 
   defp handle_event("react", _payload, socket), do: {:reply, error(:bad_payload), socket}
 
+  defp handle_event(
+         "board_stroke",
+         %{"boardId" => board_id, "points" => points, "color" => color, "width" => width},
+         socket
+       ) do
+    with :ok <- near_prop(socket, board_id) do
+      result(
+        Space.board_stroke(
+          socket.assigns.space_id,
+          socket.assigns.player_id,
+          board_id,
+          points,
+          color,
+          width
+        ),
+        socket
+      )
+    end
+  end
+
+  defp handle_event("board_clear", %{"boardId" => board_id}, socket) do
+    with :ok <- near_prop(socket, board_id) do
+      result(Space.board_clear(socket.assigns.space_id, board_id), socket)
+    end
+  end
+
+  defp handle_event(
+         "sticker_add",
+         %{"boardId" => board_id, "url" => url, "x" => x, "y" => y, "rot" => rot},
+         socket
+       ) do
+    with :ok <- near_prop(socket, board_id) do
+      result(
+        Space.sticker_add(
+          socket.assigns.space_id,
+          socket.assigns.player_id,
+          board_id,
+          url,
+          x,
+          y,
+          rot
+        ),
+        socket
+      )
+    end
+  end
+
+  defp handle_event("sticker_remove", %{"boardId" => board_id, "stickerId" => sticker_id}, socket) do
+    with :ok <- near_prop(socket, board_id) do
+      result(Space.sticker_remove(socket.assigns.space_id, board_id, sticker_id), socket)
+    end
+  end
+
+  defp handle_event("prop_use", %{"propId" => prop_id, "action" => action} = payload, socket) do
+    with :ok <- near_prop(socket, prop_id) do
+      case Space.prop_use(
+             socket.assigns.space_id,
+             socket.assigns.player_id,
+             prop_id,
+             action,
+             payload["item"]
+           ) do
+        {:ok, prop} -> {:reply, {:ok, %{prop: prop}}, socket}
+        {:error, reason} -> {:reply, error(reason), socket}
+      end
+    end
+  end
+
+  # Paper basketball: one throw per 0.6 s, from where you stand.
+  defp handle_event("toss", %{"origin" => origin, "vel" => vel}, socket) do
+    now = now_ms()
+
+    cond do
+      (last = socket.assigns[:last_toss]) && now - last < 600 ->
+        {:reply, error(:rate_limited), socket}
+
+      not Toss.valid?(origin, vel, position(socket)) ->
+        {:reply, error(:bad_payload), socket}
+
+      true ->
+        :ok = Space.toss(socket.assigns.space_id, socket.assigns.player_id, origin, vel)
+        {:noreply, assign(socket, last_toss: now)}
+    end
+  end
+
+  defp handle_event("alarm_pull", %{"propId" => prop_id}, socket) do
+    with :ok <- near_prop(socket, prop_id),
+         %{type: "fire_alarm"} <-
+           Level.prop(Level.get(), prop_id) || {:reply, error(:unknown_prop), socket} do
+      result(Space.pull_alarm(socket.assigns.space_id, socket.assigns.player_id), socket)
+    else
+      %{} -> {:reply, error(:unknown_prop), socket}
+      reply -> reply
+    end
+  end
+
+  defp handle_event("prank", %{"deskId" => desk_id}, socket) do
+    with %{position: {dx, dz}} <-
+           Level.get().desks[desk_id] || {:reply, error(:unknown_prop), socket},
+         {x, z} <- position(socket) || {:reply, error(:too_far), socket},
+         true <-
+           :math.sqrt((x - dx) ** 2 + (z - dz) ** 2) <= 2.2 || {:reply, error(:too_far), socket} do
+      result(Space.prank(socket.assigns.space_id, socket.assigns.player_id, desk_id), socket)
+    end
+  end
+
   # Zone-local chat only reaches players currently in that zone.
   @impl true
   def handle_out("chat", %{msg: %{scope: "zone", zone: zone}} = payload, socket) do
@@ -219,6 +326,28 @@ defmodule OfficeWeb.SpaceChannel do
   defp position(%{assigns: %{last: {{x, _y, z, _r, _a}, _}}}), do: {x, z}
   defp position(_socket), do: nil
 
+  defp near_prop(socket, prop_id) do
+    case Level.prop(Level.get(), prop_id) do
+      nil ->
+        {:reply, error(:unknown_prop), socket}
+
+      %{position: {px, pz}, zone_id: zone_id} ->
+        same_zone = zone_id == nil or zone_id == socket.assigns.zone
+
+        case position(socket) do
+          {x, z} when same_zone ->
+            if :math.sqrt((x - px) ** 2 + (z - pz) ** 2) <= 2.5 do
+              :ok
+            else
+              {:reply, error(:too_far), socket}
+            end
+
+          _ ->
+            {:reply, error(:too_far), socket}
+        end
+    end
+  end
+
   defp meta(socket) do
     %{
       name: socket.assigns.name,
@@ -230,7 +359,8 @@ defmodule OfficeWeb.SpaceChannel do
     }
   end
 
-  defp result({:ok, _screen}, socket), do: {:reply, :ok, socket}
+  defp result(:ok, socket), do: {:reply, :ok, socket}
+  defp result({:ok, _}, socket), do: {:reply, :ok, socket}
   defp result({:error, reason}, socket), do: {:reply, error(reason), socket}
 
   defp error(reason), do: {:error, %{reason: to_string(reason)}}

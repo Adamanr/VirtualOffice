@@ -1,5 +1,6 @@
 import { Html } from '@react-three/drei'
 import { useEffect, useState } from 'react'
+import { useActivity } from '../store/activity'
 import { useMedia } from '../store/media'
 import { usePlayers } from '../store/players'
 
@@ -11,6 +12,7 @@ export function Nameplate({ id }: { id: string }) {
   const player = usePlayers((s) => s.players[id])
   const reaction = usePlayers((s) => s.reactions[id])
   const speaking = useMedia((s) => s.speaking[id] ?? false)
+  const bubble = useActivity((s) => s.bubbles[id])
   const [, force] = useState(0)
 
   useEffect(() => {
@@ -20,11 +22,23 @@ export function Nameplate({ id }: { id: string }) {
     return () => clearTimeout(timer)
   }, [reaction])
 
+  useEffect(() => {
+    if (!bubble) return
+    const timer = setTimeout(() => force((n) => n + 1), Math.max(0, bubble.until - Date.now()))
+    return () => clearTimeout(timer)
+  }, [bubble])
+
   if (!player) return null
   const showReaction = reaction && Date.now() - reaction.at < REACTION_MS
+  const showBubble = bubble && bubble.until > Date.now()
   return (
     <Html position={[0, 2.05, 0]} center zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
       <div className="nameplate">
+        {showBubble && (
+          <div key={bubble.until} className="speech-bubble">
+            {bubble.text}
+          </div>
+        )}
         {showReaction && <div className="nameplate-reaction">{EMOJI[reaction.emoji - 1]}</div>}
         <div className={`nameplate-tag${speaking && !player.muted ? ' speaking' : ''}`}>
           <span className="nameplate-dot" style={{ background: player.color }} />

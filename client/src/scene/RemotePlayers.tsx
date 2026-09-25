@@ -27,7 +27,7 @@ function RemotePlayer({ id, color }: { id: string; color: string }) {
 
   return (
     <group ref={group} visible={false}>
-      <Avatar color={color} getAnim={() => remotes.get(id)?.pose.anim ?? 0}>
+      <Avatar id={id} color={color} getAnim={() => remotes.get(id)?.pose.anim ?? 0}>
         <Nameplate id={id} />
       </Avatar>
     </group>

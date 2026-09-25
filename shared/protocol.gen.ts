@@ -50,6 +50,88 @@ export interface PlayerSnapshot {
   s: PlayerTuple;
 }
 
+export interface BoardStroke {
+  id: string;
+  boardId: string;
+  from: string;
+  points: number[];
+  color: string;
+  width: number;
+}
+
+export interface Sticker {
+  id: string;
+  boardId: string;
+  url: string;
+  x: number;
+  y: number;
+  rot: number;
+  from: string;
+}
+
+export interface PropState {
+  id: string;
+  jammed: boolean;
+  lastItem: string | null;
+  lastBuyer: string | null;
+}
+
+export interface PropFx {
+  id: string;
+  propId: string;
+  by: string;
+  action: string;
+  outcome: string;
+  item: string | null;
+  variant: number;
+  t: number;
+}
+
+export interface Toss {
+  id: string;
+  by: string;
+  origin: number[];
+  vel: number[];
+  t: number;
+  flight: number;
+  land: number[];
+  hit: 'bin' | 'player' | null;
+  target: string | null;
+  points: number;
+}
+
+export interface Score {
+  id: string;
+  name: string;
+  color: string;
+  points: number;
+  shots: number;
+  bonks: number;
+  drillMs: number | null;
+  medals: number;
+}
+
+export interface DrillEntry {
+  id: string;
+  name: string;
+  ms: number;
+}
+
+export interface DrillState {
+  active: boolean;
+  by: string | null;
+  byName: string | null;
+  startedAt: number;
+  endsAt: number;
+  cooldownUntil: number;
+  evacuated: DrillEntry[];
+}
+
+export interface Jello {
+  deskId: string;
+  by: string;
+}
+
 export interface JoinParams {
   playerId: string;
   name: string;
@@ -62,6 +144,12 @@ export interface JoinReply {
   players: PlayerSnapshot[];
   screens: ScreenState[];
   chat: ChatMessage[];
+  boards: BoardStroke[];
+  stickers: Sticker[];
+  props: PropState[];
+  scores: Score[];
+  drill: DrillState;
+  jellos: Jello[];
   serverTime: number;
 }
 
@@ -116,6 +204,52 @@ export interface ReactPayload {
   emoji: number;
 }
 
+export interface BoardStrokePayload {
+  boardId: string;
+  points: number[];
+  color: string;
+  width: number;
+}
+
+export interface BoardClearPayload {
+  boardId: string;
+}
+
+export interface StickerAddPayload {
+  boardId: string;
+  url: string;
+  x: number;
+  y: number;
+  rot: number;
+}
+
+export interface StickerRemovePayload {
+  boardId: string;
+  stickerId: string;
+}
+
+export interface PropUsePayload {
+  propId: string;
+  action: 'buy' | 'kick' | 'use';
+  item?: string;
+}
+export interface PropUseReply {
+  prop: PropState | null;
+}
+
+export interface TossPayload {
+  origin: number[];
+  vel: number[];
+}
+
+export interface AlarmPullPayload {
+  propId: string;
+}
+
+export interface PrankPayload {
+  deskId: string;
+}
+
 export interface ClientEvents {
   move: { payload: MovePayload; reply: null };
   media_state: { payload: MediaStatePayload; reply: null };
@@ -126,6 +260,14 @@ export interface ClientEvents {
   pdf_page: { payload: PdfPagePayload; reply: null };
   chat_send: { payload: ChatSendPayload; reply: null };
   react: { payload: ReactPayload; reply: null };
+  board_stroke: { payload: BoardStrokePayload; reply: null };
+  board_clear: { payload: BoardClearPayload; reply: null };
+  sticker_add: { payload: StickerAddPayload; reply: null };
+  sticker_remove: { payload: StickerRemovePayload; reply: null };
+  prop_use: { payload: PropUsePayload; reply: PropUseReply };
+  toss: { payload: TossPayload; reply: null };
+  alarm_pull: { payload: AlarmPullPayload; reply: null };
+  prank: { payload: PrankPayload; reply: null };
 }
 
 export interface BatchEvent {
@@ -150,15 +292,59 @@ export interface ReactionEvent {
   emoji: number;
 }
 
+export interface BoardStrokeEvent {
+  stroke: BoardStroke;
+}
+
+export interface BoardClearEvent {
+  boardId: string;
+}
+
+export interface StickerUpdateEvent {
+  boardId: string;
+  stickers: Sticker[];
+}
+
+export interface PropEventEvent {
+  prop: PropState | null;
+  fx: PropFx;
+}
+
+export interface TossEvent {
+  toss: Toss;
+}
+
+export interface ScoresEvent {
+  scores: Score[];
+}
+
+export interface DrillEvent {
+  drill: DrillState;
+}
+
+export interface DeskUpdateEvent {
+  deskId: string;
+  jello: boolean;
+  by: string | null;
+}
+
 export interface ServerEvents {
   batch: BatchEvent;
   correction: CorrectionEvent;
   screen_update: ScreenUpdateEvent;
   chat: ChatEvent;
   reaction: ReactionEvent;
+  board_stroke: BoardStrokeEvent;
+  board_clear: BoardClearEvent;
+  sticker_update: StickerUpdateEvent;
+  prop_event: PropEventEvent;
+  toss: TossEvent;
+  scores: ScoresEvent;
+  drill: DrillEvent;
+  desk_update: DeskUpdateEvent;
 }
 
-export type ProtocolError = 'bad_payload' | 'unknown_event' | 'rate_limited' | 'busy' | 'not_owner' | 'too_far' | 'unknown_screen' | 'livekit_disabled';
+export type ProtocolError = 'bad_payload' | 'unknown_event' | 'rate_limited' | 'busy' | 'not_owner' | 'too_far' | 'unknown_screen' | 'unknown_prop' | 'livekit_disabled' | 'cooldown';
 
-export const CLIENT_EVENTS = ["move","media_state","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react"] as const;
-export const SERVER_EVENTS = ["batch","correction","screen_update","chat","reaction"] as const;
+export const CLIENT_EVENTS = ["move","media_state","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","prop_use","toss","alarm_pull","prank"] as const;
+export const SERVER_EVENTS = ["batch","correction","screen_update","chat","reaction","board_stroke","board_clear","sticker_update","prop_event","toss","scores","drill","desk_update"] as const;

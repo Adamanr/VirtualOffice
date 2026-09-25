@@ -75,8 +75,9 @@ export function HelpHint() {
     <div className="panel help" onClick={() => setOpen(false)} title="Скрыть">
       <div><kbd>WASD</kbd> ходить, <kbd>Shift</kbd> бег</div>
       <div><kbd>мышь</kbd> камера, <kbd>колесо</kbd> зум, <kbd>Tab</kbd> вид сверху</div>
-      <div><kbd>E</kbd> действие, <kbd>F</kbd> экран крупно</div>
+      <div><kbd>E</kbd> действие (мебель, доски, экраны), <kbd>F</kbd> экран крупно</div>
       <div><kbd>M</kbd> микрофон, <kbd>V</kbd> камера, <kbd>Enter</kbd> чат, <kbd>1–5</kbd> реакции</div>
+      <div><kbd>G</kbd> (держать) бумажкой в урну, <kbd>J</kbd> у стола — степлер в желе</div>
     </div>
   )
 }

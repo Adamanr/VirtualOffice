@@ -4,6 +4,8 @@ import { local } from '../store/local'
 import { usePlayers } from '../store/players'
 import { useScreens } from '../store/screens'
 import { addMessage, setHistory } from '../store/chat'
+import { clearPropsStore, hydrateProps } from '../store/props'
+import { resetActivity, useActivity } from '../store/activity'
 import { SpaceConnection } from './connection'
 import { applyBatch, applySnapshot, clearRemotes, clock, remotes, removeRemote } from './remotes'
 
@@ -15,6 +17,17 @@ export const getConnection = () => conn
 
 /** Set to make the next NetSync tick send the local state even if unchanged. */
 export const netFlags = { forceSend: true }
+
+/**
+ * Sends the current position right away. Actions the server checks by distance
+ * (throws, props, pranks) call this first, so they never race the 15 Hz sync
+ * (e.g. right after joining or reconnecting).
+ */
+export function syncPosition() {
+  if (!conn || conn.channel.state !== 'joined') return
+  const r = (v: number) => Math.round(v * 1000) / 1000
+  conn.send('move', { s: [r(local.position.x), r(local.position.y), r(local.position.z), r(local.rotY), local.anim] })
+}
 
 type Listener = (c: SpaceConnection) => void
 const listeners = new Set<Listener>()
@@ -40,6 +53,12 @@ export function startSession(spaceId: string, profile: Omit<JoinParams, 'playerI
         applySnapshot(reply.serverTime, reply.players)
         useScreens.setState({ states: Object.fromEntries(reply.screens.map((sc) => [sc.id, sc])) })
         setHistory(reply.chat)
+        hydrateProps(reply.boards ?? [], reply.stickers ?? [], reply.props ?? [])
+        useActivity.setState({
+          scores: reply.scores ?? [],
+          drill: reply.drill ?? null,
+          jellos: Object.fromEntries((reply.jellos ?? []).map((j) => [j.deskId, j.by])),
+        })
         netFlags.forceSend = true
       },
       onPresence: (entries) => {
@@ -66,4 +85,10 @@ export function stopSession() {
   conn = null
   clearRemotes()
   useScreens.setState({ states: {}, overlay: null })
+  clearPropsStore()
+  resetActivity()
+}
+
+if (import.meta.env.DEV) {
+  ;(window as unknown as { __conn: () => SpaceConnection | null }).__conn = () => conn
 }

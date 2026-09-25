@@ -2,10 +2,10 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { onKey } from '../input/keyboard'
 import { canSeeScreen } from '../lib/audio'
-import { getSeat, level, seats, zoneAt } from '../lib/level'
+import { getSeat, level, props, seats, zoneAt } from '../lib/level'
 import { openOverlay } from '../screens/actions'
 import { sit, standUp } from '../screens/seats'
-import { sameTarget, useGame, type Target } from '../store/game'
+import { closePropOverlay, sameTarget, useGame, type Target } from '../store/game'
 import { local } from '../store/local'
 import { useScreens } from '../store/screens'
 
@@ -20,12 +20,14 @@ export function Interactions() {
   useEffect(() => {
     const offs = [
       onKey('KeyE', () => {
-        const { target, menuOpen, seat } = useGame.getState()
+        const { target, menuOpen, seat, overlay } = useGame.getState()
+        if (overlay) return
         if (!target) return
         if (target.kind === 'seat' && !seat) sit(target.seatId)
         else useGame.setState({ menuOpen: !menuOpen })
       }),
       onKey('KeyF', () => {
+        if (useGame.getState().overlay) return
         const { overlay, states } = useScreens.getState()
         if (overlay) return useScreens.setState({ overlay: null })
         const { target, seat } = useGame.getState()
@@ -33,14 +35,16 @@ export function Interactions() {
         if (id && states[id]) openOverlay(id)
       }),
       onKey('Escape', () => {
+        if (useGame.getState().overlay) return closePropOverlay()
         if (useScreens.getState().overlay) useScreens.setState({ overlay: null })
         else if (useGame.getState().menuOpen) useGame.setState({ menuOpen: false })
         else if (useGame.getState().seat) standUp()
       }),
-      // Walking away from a desk stands up.
+      // Walking away from a desk stands up (unless a prop overlay / menu is open).
       ...['KeyW', 'KeyA', 'KeyS', 'KeyD'].map((code) =>
         onKey(code, () => {
-          if (useGame.getState().seat && !useGame.getState().menuOpen) standUp()
+          const { seat, menuOpen, overlay } = useGame.getState()
+          if (seat && !menuOpen && !overlay) standUp()
         }),
       ),
     ]
@@ -74,6 +78,16 @@ function findTarget(): Target | null {
     if (d < range && d / range < bestScore) {
       bestScore = d / range
       best = { kind: 'seat', seatId: s.id }
+    }
+  }
+  if (best) return best
+
+  // Interactable furniture (boards, kitchen chaos, vending).
+  for (const p of props) {
+    const d = Math.hypot(p.x - x, p.z - z)
+    if (d < p.range && d / p.range < bestScore) {
+      bestScore = d / p.range
+      best = { kind: 'prop', propId: p.id }
     }
   }
   if (best) return best

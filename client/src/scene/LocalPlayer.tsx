@@ -8,6 +8,7 @@ import { isDown } from '../input/keyboard'
 import { getSeat, level } from '../lib/level'
 import { cameraState, local } from '../store/local'
 import { useGame } from '../store/game'
+import { usePlayers } from '../store/players'
 import { Avatar } from './Avatar'
 
 const WALK_SPEED = 3
@@ -25,6 +26,7 @@ function dampAngle(from: number, to: number, k: number) {
 }
 
 export function LocalPlayer({ color, children }: { color: string; children?: ReactNode }) {
+  const selfId = usePlayers((s) => s.selfId)
   const body = useRef<RapierRigidBody>(null)
   const visual = useRef<THREE.Group>(null)
   const controller = useRef<KinematicCharacterController | null>(null)
@@ -97,8 +99,8 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
     if (v) {
       v.position.copy(local.position)
       v.rotation.y = local.rotY
-      // The desk camera sits where our head is.
-      v.visible = getSeat(useGame.getState().seat)?.kind !== 'desk'
+      // The desk camera sits where our head is; so does a camera squeezed against a wall.
+      v.visible = getSeat(useGame.getState().seat)?.kind !== 'desk' && (useGame.getState().cameraMode === 'top' || cameraState.current > 0.7)
     }
   })
 
@@ -114,7 +116,7 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
         <CapsuleCollider args={[CAPSULE_HALF, CAPSULE_RADIUS]} />
       </RigidBody>
       <group ref={visual}>
-        <Avatar color={color} getAnim={() => local.anim}>
+        <Avatar id={selfId} color={color} getAnim={() => local.anim}>
           {children}
         </Avatar>
       </group>

@@ -12,9 +12,19 @@ import { MediaBanners, MediaControls, VideoTiles } from './MediaHud'
 import { MediaSync } from '../scene/MediaSync'
 import { Interactions } from '../scene/Interactions'
 import { Screens } from '../scene/Screens'
+import { BoardSurfaces } from '../scene/BoardSurfaces'
+import { FxLayer } from '../fx/FxLayer'
+import { PropDevices } from '../scene/PropDevices'
+import { Tosses } from '../scene/Tosses'
+import { Jellos } from '../scene/Jellos'
+import { Scoreboard } from '../scene/Scoreboard'
+import { DrillFx } from '../scene/DrillFx'
+import { ActivityHud } from './ActivityHud'
 import { InteractionMenu, InteractionPrompt, ScreenOverlay } from './ScreenUi'
+import { IntranetMenuItem, PropMenu, PropOverlays, PropPrompt } from './PropUi'
 import '../screens/actions'
 import '../screens/pdfActions'
+import '../props/actions'
 import { ChatButton, ChatPanel, ReactionButtons } from './Chat'
 import { PdfDropZone, PdfHint, PdfMenuItems, PdfOverlay } from './PdfUi'
 import { navigate } from '../lib/route'
@@ -59,15 +69,33 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
         <MediaSync />
         <Interactions />
         <Screens />
+        <BoardSurfaces />
+        <PropDevices />
+        <Jellos />
+        <Scoreboard />
+        <Tosses />
+        <DrillFx />
+        <FxLayer />
         <RemotePlayers />
       </Scene>
       <TopBar spaceId={spaceId} />
       <VideoTiles />
       <MediaBanners />
       <InteractionPrompt />
-      <InteractionMenu extra={(id) => <PdfMenuItems screenId={id} />} />
+      <PropPrompt />
+      <InteractionMenu
+        extra={(id) => (
+          <>
+            <IntranetMenuItem />
+            <PdfMenuItems screenId={id} />
+          </>
+        )}
+      />
+      <PropMenu />
+      <ActivityHud />
       <PdfHint />
       <ScreenOverlay renderPdf={(id) => <PdfOverlay screenId={id} />} />
+      <PropOverlays />
       <PdfDropZone />
       <ChatPanel />
       <MediaControls>

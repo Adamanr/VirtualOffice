@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildLevelGeometry } from '../scene/levelGeometry'
-import { buildSeats, getScreen, level, rotateXZ, seats, zoneAt } from './level'
+import { buildProps, buildSeats, getScreen, level, props, rotateXZ, seats, zoneAt } from './level'
 
 describe('zoneAt', () => {
   it('resolves rooms before the open space that contains them', () => {
@@ -59,22 +59,27 @@ describe('buildLevelGeometry', () => {
     expect(keys.size).toBeLessThan(40)
   })
 
-  const blocked = (x: number, z: number, y = 0.9) =>
+  /** Matches LocalPlayer CapsuleCollider radius — exits must clear furniture by this much. */
+  const CAPSULE_R = 0.35
+  const blocked = (x: number, z: number, margin = 0) =>
     geo.colliders.some((c) => {
-      // Point in rotated box (XZ), and within its height.
+      // Standing capsule spans roughly y 0..1.7; skip ceilings / high shelves.
+      const top = c.center[1] + c.half[1]
+      const bot = c.center[1] - c.half[1]
+      if (top < 0.05 || bot > 1.7) return false
       const dx = x - c.center[0]
       const dz = z - c.center[2]
       const lx = dx * Math.cos(-c.rotY) + dz * Math.sin(-c.rotY)
       const lz = -dx * Math.sin(-c.rotY) + dz * Math.cos(-c.rotY)
-      return Math.abs(lx) < c.half[0] && Math.abs(lz) < c.half[2] && Math.abs(y - c.center[1]) < c.half[1]
+      return Math.abs(lx) < c.half[0] + margin && Math.abs(lz) < c.half[2] + margin
     })
 
   it('spawns outside any collider', () => {
-    expect(blocked(level.spawn.position[0], level.spawn.position[1])).toBe(false)
+    expect(blocked(level.spawn.position[0], level.spawn.position[1], CAPSULE_R)).toBe(false)
   })
 
   it('lets you stand up from every seat into free space', () => {
-    for (const s of seats) expect(blocked(s.exit[0], s.exit[1]), s.id).toBe(false)
+    for (const s of seats) expect(blocked(s.exit[0], s.exit[1], CAPSULE_R), s.id).toBe(false)
   })
 })
 
@@ -99,5 +104,21 @@ describe('seats', () => {
 
   it('is a pure function of the level', () => {
     expect(buildSeats(level)).toEqual(seats)
+  })
+})
+
+describe('props', () => {
+  it('derives interactive furniture with stable ids', () => {
+    const kinds = new Set(props.map((p) => p.kind))
+    expect(kinds.has('whiteboard')).toBe(true)
+    expect(kinds.has('vending_machine')).toBe(true)
+    expect(kinds.has('coffee_machine')).toBe(true)
+    expect(kinds.has('bulletin_board')).toBe(true)
+    expect(new Set(props.map((p) => p.id)).size).toBe(props.length)
+    expect(buildProps(level)).toEqual(props)
+    for (const p of props) {
+      expect(p.id).toMatch(/^prop_\d+$/)
+      expect(p.range).toBeGreaterThan(0.5)
+    }
   })
 })

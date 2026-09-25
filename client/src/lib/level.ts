@@ -70,6 +70,7 @@ export type FurnitureType =
   | 'trash_bin'
   | 'podium'
   | 'rug'
+  | 'fire_alarm'
 
 export interface LevelFurniture {
   type: FurnitureType
@@ -128,6 +129,10 @@ export interface Level {
   windows?: LevelWindow[]
   signs?: LevelSign[]
   clocks?: LevelClock[]
+  activities?: {
+    scoreboard?: { position: Vec3; rotationY: number; size: Vec2 }
+    assembly?: { position: Vec2; radius: number }
+  }
 }
 
 export const level = raw as unknown as Level
@@ -212,11 +217,21 @@ export function buildSeats(lvl: Level): Seat[] {
       const places = Math.max(1, Math.floor(w / 0.8))
       for (let k = 0; k < places; k++) {
         const lx = (k - (places - 1) / 2) * (w / places)
-        const [dx, dz] = rotateXZ(lx, 0.1, r)
+        // Sit toward the backrest so legs clear a coffee table in front.
+        const [dx, dz] = rotateXZ(lx, -0.05, r)
         const sx = x + dx
         const sz = z + dz
-        // Sofas are against walls: stand up forward.
-        seats.push({ id: `sofa_${i}_${k}`, kind: 'sofa', x: sx, z: sz, rotY: r, zoneId, screenId: wallScreenOf(zoneId), exit: back(sx, sz, r, -0.7) })
+        // Sofas are against walls: stand up forward into the gap before the table.
+        seats.push({
+          id: `sofa_${i}_${k}`,
+          kind: 'sofa',
+          x: sx,
+          z: sz,
+          rotY: r,
+          zoneId,
+          screenId: wallScreenOf(zoneId),
+          exit: back(sx, sz, r, -1.05),
+        })
       }
     }
   })
@@ -226,3 +241,93 @@ export function buildSeats(lvl: Level): Seat[] {
 export const seats = buildSeats(level)
 const seatById = new Map(seats.map((s) => [s.id, s]))
 export const getSeat = (id: string | null | undefined) => (id ? seatById.get(id) : undefined)
+
+/** Furniture the player can use with E (kitchen chaos, boards, vending…). */
+export type PropKind =
+  | 'whiteboard'
+  | 'bulletin_board'
+  | 'vending_machine'
+  | 'coffee_machine'
+  | 'water_cooler'
+  | 'microwave'
+  | 'fridge'
+  | 'copier'
+  | 'fire_alarm'
+
+const PROP_KINDS = new Set<FurnitureType>([
+  'whiteboard',
+  'bulletin_board',
+  'vending_machine',
+  'coffee_machine',
+  'water_cooler',
+  'microwave',
+  'fridge',
+  'copier',
+  'fire_alarm',
+])
+
+export interface Prop {
+  id: string
+  kind: PropKind
+  x: number
+  z: number
+  rotY: number
+  zoneId: string | null
+  /** Board face size [width, height] for wall-mounted props. */
+  size: Vec2
+  elevation: number
+  range: number
+  label: string
+  prompt: string
+}
+
+const PROP_META: Record<PropKind, { label: string; prompt: string; range: number; defaultSize: Vec2; elevation: number }> = {
+  whiteboard: { label: 'Доска', prompt: 'рисовать на доске', range: 1.6, defaultSize: [2.2, 1.1], elevation: 1.55 },
+  bulletin_board: { label: 'Доска объявлений', prompt: 'прикрепить стикер', range: 1.5, defaultSize: [1.6, 1.0], elevation: 1.6 },
+  vending_machine: { label: 'Автомат', prompt: 'купить что-нибудь', range: 1.4, defaultSize: [0.9, 1.9], elevation: 0.95 },
+  coffee_machine: { label: 'Кофемашина', prompt: 'сварить кофе', range: 1.2, defaultSize: [0.3, 0.4], elevation: 1.15 },
+  water_cooler: { label: 'Кулер', prompt: 'посплетничать', range: 1.3, defaultSize: [0.34, 1.4], elevation: 0.9 },
+  microwave: { label: 'Микроволновка', prompt: 'разогреть', range: 1.2, defaultSize: [0.5, 0.3], elevation: 1.1 },
+  fridge: { label: 'Холодильник', prompt: 'открыть холодильник', range: 1.3, defaultSize: [0.8, 1.9], elevation: 0.95 },
+  copier: { label: 'Ксерокс', prompt: 'напечатать', range: 1.4, defaultSize: [1.0, 0.9], elevation: 0.45 },
+  fire_alarm: { label: 'Пожарная тревога', prompt: 'пожарная тревога', range: 1.3, defaultSize: [0.18, 0.24], elevation: 1.35 },
+}
+
+/** Derives interactable props from furniture. Pure, covered by tests. */
+export function buildProps(lvl: Level): Prop[] {
+  const out: Prop[] = []
+  lvl.furniture.forEach((f, i) => {
+    if (!PROP_KINDS.has(f.type)) return
+    const kind = f.type as PropKind
+    const meta = PROP_META[kind]
+    const [x, z] = f.position
+    const size = f.size ?? meta.defaultSize
+    out.push({
+      id: `prop_${i}`,
+      kind,
+      x,
+      z,
+      rotY: f.rotationY ?? 0,
+      zoneId: zoneAt(lvl, x, z)?.id ?? null,
+      size,
+      elevation: f.elevation ?? meta.elevation,
+      range: meta.range,
+      label: meta.label,
+      prompt: meta.prompt,
+    })
+  })
+  return out
+}
+
+export const props = buildProps(level)
+const propById = new Map(props.map((p) => [p.id, p]))
+export const getProp = (id: string | null | undefined) => (id ? propById.get(id) : undefined)
+
+/** Trash bins: targets for paper basketball. Ids match the server (`bin_<furniture index>`). */
+export const bins = level.furniture.flatMap((f, i) => (f.type === 'trash_bin' ? [{ id: `bin_${i}`, x: f.position[0], z: f.position[1] }] : []))
+
+/** Point on a prop in world space, from a local offset (x right, y up, z forward). */
+export function propPoint(p: Prop, lx: number, ly: number, lz: number): Vec3 {
+  const [dx, dz] = rotateXZ(lx, lz, p.rotY)
+  return [p.x + dx, ly, p.z + dz]
+}

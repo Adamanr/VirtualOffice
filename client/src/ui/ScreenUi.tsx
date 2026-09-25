@@ -24,7 +24,7 @@ export function InteractionPrompt() {
   const state = useScreens((s) => (screenId ? s.states[screenId] : undefined))
   const selfId = usePlayers((s) => s.selfId)
   const owner = usePlayers((s) => (state?.owner ? s.players[state.owner] : undefined))
-  if (!target || menuOpen) return null
+  if (!target || menuOpen || target.kind === 'prop') return null
 
   let text: React.ReactNode
   if (target.kind === 'seat' && !seat) {
@@ -84,7 +84,7 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
   const state = useScreens((s) => (screenId ? s.states[screenId] : undefined))
   const selfId = usePlayers((s) => s.selfId)
   const mediaOk = useMedia((s) => s.status === 'connected')
-  if (!menuOpen || !target) return null
+  if (!menuOpen || !target || target.kind === 'prop') return null
   const screen = screenId ? getScreen(screenId) : undefined
   const mine = state?.owner === selfId
   const canShare = typeof navigator.mediaDevices?.getDisplayMedia === 'function'

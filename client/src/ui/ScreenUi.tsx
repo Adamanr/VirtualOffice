@@ -1,19 +1,19 @@
 import { useEffect, useRef } from 'react'
-import { getDesk, getScreen, screenLabel } from '../lib/level'
+import { getScreen, getSeat, screenLabel } from '../lib/level'
 import { closeOverlay, openOverlay, shareScreen, stopPresenting } from '../screens/actions'
-import { standUp } from '../screens/desks'
+import { standUp } from '../screens/seats'
 import { useGame } from '../store/game'
 import { useMedia } from '../store/media'
 import { usePlayers } from '../store/players'
 import { useScreens } from '../store/screens'
 
-/** Screen id the current target refers to (a wall screen, or the monitor of the desk you sit at). */
+/** Screen the current target refers to: a wall screen, or the screen of the seat you sit on
+ *  (the desk monitor, or the wall screen of the room). */
 function useTargetScreen(): string | null {
   const target = useGame((s) => s.target)
   const seat = useGame((s) => s.seat)
   if (target?.kind === 'screen') return target.screenId
-  if (target?.kind === 'desk' && seat === target.deskId) return getDesk(seat)?.screenId ?? null
-  return null
+  return getSeat(seat)?.screenId ?? null
 }
 
 export function InteractionPrompt() {
@@ -27,16 +27,31 @@ export function InteractionPrompt() {
   if (!target || menuOpen) return null
 
   let text: React.ReactNode
-  if (target.kind === 'desk' && !seat) {
+  if (target.kind === 'seat' && !seat) {
+    const kind = getSeat(target.seatId)?.kind
     text = (
       <>
-        <kbd>E</kbd> сесть за стол
+        <kbd>E</kbd> {kind === 'desk' ? 'сесть за стол' : kind === 'sofa' ? 'сесть на диван' : 'сесть'}
+      </>
+    )
+  } else if (seat && !screenId) {
+    text = (
+      <>
+        <kbd>Esc</kbd> встать
       </>
     )
   } else if (seat) {
+    const busy = state && state.owner !== selfId
     text = (
       <>
-        <kbd>E</kbd> меню монитора · <kbd>Esc</kbd> встать
+        <kbd>E</kbd> {getScreen(screenId!)?.kind === 'desk' ? 'меню монитора' : 'меню экрана'}
+        {busy && (
+          <>
+            {' '}
+            · <kbd>F</kbd> крупно · показывает {owner?.name ?? '…'}
+          </>
+        )}{' '}
+        · <kbd>Esc</kbd> встать
       </>
     )
   } else if (state && state.owner !== selfId) {
@@ -76,7 +91,7 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
 
   return (
     <div className="menu panel" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="menu-title">{screen ? screenLabel(screen) : 'Стол'}</div>
+      <div className="menu-title">{screen ? screenLabel(screen) : 'Место'}</div>
       {screen?.kind === 'desk' && !state && <div className="muted small">Видят те, кто рядом (≈{screen.viewDistance ?? 6} м) — удобно для парного программирования</div>}
       {screen && !state && (
         <>

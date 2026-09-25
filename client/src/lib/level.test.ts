@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildLevelGeometry } from '../scene/levelGeometry'
-import { getScreen, level, rotateXZ, zoneAt } from './level'
+import { buildSeats, getScreen, level, rotateXZ, seats, zoneAt } from './level'
 
 describe('zoneAt', () => {
   it('resolves rooms before the open space that contains them', () => {
@@ -38,7 +38,7 @@ describe('buildLevelGeometry', () => {
 
   it('leaves doorways free of colliders', () => {
     for (const wall of level.walls) {
-      for (const door of wall.doors ?? []) {
+      for (const door of (wall.doors ?? []).filter((d) => !d.closed)) {
         const alongX = wall.from[1] === wall.to[1]
         const px = alongX ? door.at : wall.from[0]
         const pz = alongX ? wall.from[1] : door.at
@@ -56,6 +56,48 @@ describe('buildLevelGeometry', () => {
 
   it('keeps the number of distinct materials (≈ draw calls) small', () => {
     const keys = new Set(geo.pieces.map((p) => `${p.material}:${p.shape}`))
-    expect(keys.size).toBeLessThan(20)
+    expect(keys.size).toBeLessThan(40)
+  })
+
+  const blocked = (x: number, z: number, y = 0.9) =>
+    geo.colliders.some((c) => {
+      // Point in rotated box (XZ), and within its height.
+      const dx = x - c.center[0]
+      const dz = z - c.center[2]
+      const lx = dx * Math.cos(-c.rotY) + dz * Math.sin(-c.rotY)
+      const lz = -dx * Math.sin(-c.rotY) + dz * Math.cos(-c.rotY)
+      return Math.abs(lx) < c.half[0] && Math.abs(lz) < c.half[2] && Math.abs(y - c.center[1]) < c.half[1]
+    })
+
+  it('spawns outside any collider', () => {
+    expect(blocked(level.spawn.position[0], level.spawn.position[1])).toBe(false)
+  })
+
+  it('lets you stand up from every seat into free space', () => {
+    for (const s of seats) expect(blocked(s.exit[0], s.exit[1]), s.id).toBe(false)
+  })
+})
+
+describe('seats', () => {
+  it('derives desk, chair and sofa seats', () => {
+    const kinds = new Set(seats.map((s) => s.kind))
+    expect(kinds).toEqual(new Set(['desk', 'chair', 'sofa']))
+    expect(seats.filter((s) => s.kind === 'desk')).toHaveLength(level.desks.length)
+    expect(new Set(seats.map((s) => s.id)).size).toBe(seats.length)
+  })
+
+  it('chairs in rooms with a screen look at that screen; desks at their monitor', () => {
+    const conference = seats.filter((s) => s.kind === 'chair' && s.zoneId === 'meeting_room_1')
+    expect(conference.length).toBeGreaterThan(0)
+    for (const s of conference) expect(s.screenId).toBe('meeting_room_1_screen')
+    const hall = seats.filter((s) => s.zoneId === 'hall')
+    expect(hall.length).toBeGreaterThan(20)
+    for (const s of hall) expect(s.screenId).toBe('hall_screen')
+    for (const s of seats.filter((x) => x.kind === 'desk')) expect(getScreen(s.screenId!)?.deskId).toBe(s.deskId)
+    expect(seats.find((s) => s.zoneId === 'kitchen' && s.kind === 'chair')?.screenId).toBeNull()
+  })
+
+  it('is a pure function of the level', () => {
+    expect(buildSeats(level)).toEqual(seats)
   })
 })

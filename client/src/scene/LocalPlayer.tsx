@@ -5,7 +5,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { Anim } from '@shared/protocol.gen'
 import { isDown } from '../input/keyboard'
-import { level } from '../lib/level'
+import { getSeat, level } from '../lib/level'
 import { cameraState, local } from '../store/local'
 import { useGame } from '../store/game'
 import { Avatar } from './Avatar'
@@ -98,7 +98,7 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
       v.position.copy(local.position)
       v.rotation.y = local.rotY
       // The desk camera sits where our head is.
-      v.visible = !seated
+      v.visible = getSeat(useGame.getState().seat)?.kind !== 'desk'
     }
   })
 

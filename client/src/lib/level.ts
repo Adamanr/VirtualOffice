@@ -3,6 +3,8 @@ import raw from '@shared/level.json'
 export type Vec2 = [number, number]
 export type Vec3 = [number, number, number]
 
+export type FloorPattern = 'carpet' | 'tiles' | 'wood'
+
 export interface LevelZone {
   id: string
   name: string
@@ -10,6 +12,7 @@ export interface LevelZone {
   min: Vec2
   max: Vec2
   floorColor: string | null
+  floorPattern?: FloorPattern
 }
 
 export interface LevelScreen {
@@ -34,21 +37,85 @@ export interface LevelWall {
   from: Vec2
   to: Vec2
   material?: 'wall' | 'glass'
-  doors?: { at: number; width: number }[]
+  /** Door openings; `closed` doors are drawn (and block) but look like doors. */
+  doors?: { at: number; width: number; closed?: boolean }[]
+  /** Ranges along the wall covered by blinds (glass walls). */
+  blinds?: Vec2[]
 }
 
+export type FurnitureType =
+  | 'chair'
+  | 'meeting_table'
+  | 'cafe_table'
+  | 'coffee_table'
+  | 'sofa'
+  | 'counter'
+  | 'plant'
+  | 'stage'
+  | 'cubicle'
+  | 'reception_desk'
+  | 'manager_desk'
+  | 'conference_phone'
+  | 'whiteboard'
+  | 'bulletin_board'
+  | 'picture'
+  | 'bookshelf'
+  | 'filing_cabinet'
+  | 'water_cooler'
+  | 'copier'
+  | 'vending_machine'
+  | 'fridge'
+  | 'microwave'
+  | 'coffee_machine'
+  | 'trash_bin'
+  | 'podium'
+  | 'rug'
+
 export interface LevelFurniture {
-  type: 'chair' | 'meeting_table' | 'cafe_table' | 'coffee_table' | 'sofa' | 'counter' | 'plant' | 'stage'
+  type: FurnitureType
   position: Vec2
   rotationY?: number
   size?: Vec2
+  /** Center height for wall-mounted items. */
+  elevation?: number
+  /** Floor offset (e.g. standing on the stage). */
+  base?: number
+  color?: string
+}
+
+export interface LevelWindow {
+  /** Center of the pane on the inner face of the wall. */
+  position: Vec3
+  /** Facing into the room. */
+  rotationY: number
+  size: Vec2
+  /** Fraction of the window covered by lowered blinds (0..1). */
+  blinds: number
+}
+
+export interface LevelSign {
+  text: string
+  sub?: string
+  position: Vec3
+  rotationY: number
+  size: Vec2
+  bg: string
+  fg: string
+}
+
+export interface LevelClock {
+  position: Vec3
+  rotationY: number
+  radius: number
 }
 
 export interface Level {
   version: number
   name: string
   glb: string | null
+  branding?: { company: string; tagline: string }
   bounds: { min: Vec2; max: Vec2 }
+  floorPattern?: FloorPattern
   spawn: { position: Vec2; rotationY: number }
   wallHeight: number
   wallThickness: number
@@ -58,6 +125,9 @@ export interface Level {
   desks: LevelDesk[]
   screens: LevelScreen[]
   furniture: LevelFurniture[]
+  windows?: LevelWindow[]
+  signs?: LevelSign[]
+  clocks?: LevelClock[]
 }
 
 export const level = raw as unknown as Level
@@ -96,3 +166,63 @@ export function deskSeat(desk: LevelDesk): { x: number; z: number; rotY: number 
   const [dx, dz] = rotateXZ(0, -0.75, desk.rotationY)
   return { x: desk.position[0] + dx, z: desk.position[1] + dz, rotY: desk.rotationY }
 }
+
+/** Somewhere to sit: a desk chair, any chair, or a place on a sofa. */
+export interface Seat {
+  id: string
+  kind: 'desk' | 'chair' | 'sofa'
+  x: number
+  z: number
+  /** Facing direction while seated. */
+  rotY: number
+  zoneId: string | null
+  /** For desk seats: the desk (its monitor is the seat's screen). */
+  deskId?: string
+  /** Screen to look at while seated: the desk monitor, or the room's wall screen. */
+  screenId: string | null
+  /** Where to stand up to (feet position). */
+  exit: Vec2
+}
+
+/** Derives all seats from desks, chairs and sofas of a level. Pure, covered by tests. */
+export function buildSeats(lvl: Level): Seat[] {
+  const seats: Seat[] = []
+  const wallScreenOf = (zoneId: string | null) => lvl.screens.find((s) => s.kind === 'wall' && s.zoneId === zoneId)?.id ?? null
+  const back = (x: number, z: number, r: number, d: number): Vec2 => [x - Math.sin(r) * d, z - Math.cos(r) * d]
+  for (const desk of lvl.desks) {
+    const s = deskSeat(desk)
+    seats.push({
+      id: desk.id,
+      kind: 'desk',
+      ...s,
+      zoneId: zoneAt(lvl, s.x, s.z)?.id ?? null,
+      deskId: desk.id,
+      screenId: desk.screenId,
+      exit: back(s.x, s.z, s.rotY, 0.55),
+    })
+  }
+  lvl.furniture.forEach((f, i) => {
+    const [x, z] = f.position
+    const r = f.rotationY ?? 0
+    const zoneId = zoneAt(lvl, x, z)?.id ?? null
+    if (f.type === 'chair') {
+      seats.push({ id: `chair_${i}`, kind: 'chair', x, z, rotY: r, zoneId, screenId: wallScreenOf(zoneId), exit: back(x, z, r, 0.55) })
+    } else if (f.type === 'sofa') {
+      const [w] = f.size ?? [2, 0.9]
+      const places = Math.max(1, Math.floor(w / 0.8))
+      for (let k = 0; k < places; k++) {
+        const lx = (k - (places - 1) / 2) * (w / places)
+        const [dx, dz] = rotateXZ(lx, 0.1, r)
+        const sx = x + dx
+        const sz = z + dz
+        // Sofas are against walls: stand up forward.
+        seats.push({ id: `sofa_${i}_${k}`, kind: 'sofa', x: sx, z: sz, rotY: r, zoneId, screenId: wallScreenOf(zoneId), exit: back(sx, sz, r, -0.7) })
+      }
+    }
+  })
+  return seats
+}
+
+export const seats = buildSeats(level)
+const seatById = new Map(seats.map((s) => [s.id, s]))
+export const getSeat = (id: string | null | undefined) => (id ? seatById.get(id) : undefined)

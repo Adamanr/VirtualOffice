@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getDesk } from '../lib/level'
+import { getSeat } from '../lib/level'
 import { flipPage, pickPdf, presentPdf } from '../screens/pdfActions'
 import { renderPage } from '../screens/pdfLazy'
 import { notify, useGame } from '../store/game'
@@ -83,8 +83,7 @@ export function PdfHint() {
 /** Screen the player may drop a PDF onto: the E-target (wall screen or own desk monitor), if free or ours. */
 function dropTarget(): string | null {
   const { target, seat } = useGame.getState()
-  const id =
-    target?.kind === 'screen' ? target.screenId : target?.kind === 'desk' && seat === target.deskId ? getDesk(seat)?.screenId : null
+  const id = target?.kind === 'screen' ? target.screenId : (getSeat(seat)?.screenId ?? null)
   if (!id) return null
   const owner = useScreens.getState().states[id]?.owner
   return !owner || owner === usePlayers.getState().selfId ? id : null
@@ -116,7 +115,7 @@ export function PdfDropZone() {
       const file = e.dataTransfer?.files[0]
       if (!file) return
       const screenId = dropTarget()
-      if (!screenId) return notify('Подойдите к свободному экрану (или сядьте за стол), чтобы показать PDF')
+      if (!screenId) return notify('Подойдите к свободному экрану (или сядьте рядом с ним), чтобы показать PDF')
       void presentPdf(screenId, file)
     }
     window.addEventListener('dragenter', enter)

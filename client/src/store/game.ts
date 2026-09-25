@@ -3,11 +3,11 @@ import { create } from 'zustand'
 export type CameraMode = 'third' | 'top'
 
 /** Something the player can interact with right now (nearest in range). */
-export type Target = { kind: 'screen'; screenId: string } | { kind: 'desk'; deskId: string }
+export type Target = { kind: 'screen'; screenId: string } | { kind: 'seat'; seatId: string }
 
 interface GameState {
   cameraMode: CameraMode
-  /** Desk id the local player is sitting at. */
+  /** Seat id (desk, chair or sofa place) the local player is sitting on. */
   seat: string | null
   /** Zone the local player is in (updated on change only). */
   zoneId: string | null
@@ -42,4 +42,4 @@ export const sameTarget = (a: Target | null, b: Target | null) =>
   (!!a &&
     !!b &&
     a.kind === b.kind &&
-    (a.kind === 'screen' ? a.screenId === (b as typeof a).screenId : a.deskId === (b as typeof a).deskId))
+    (a.kind === 'screen' ? a.screenId === (b as typeof a).screenId : a.seatId === (b as typeof a).seatId))

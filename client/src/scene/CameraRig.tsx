@@ -3,7 +3,7 @@ import { useRapier } from '@react-three/rapier'
 import { useEffect } from 'react'
 import * as THREE from 'three'
 import { onKey } from '../input/keyboard'
-import { getDesk, getScreen } from '../lib/level'
+import { getScreen, getSeat } from '../lib/level'
 import { useGame } from '../store/game'
 import { cameraState, local } from '../store/local'
 import { playerBody } from './LocalPlayer'
@@ -79,7 +79,23 @@ export function CameraRig() {
     const { cameraMode, seat } = useGame.getState()
     target.set(local.position.x, local.position.y + HEAD, local.position.z)
 
-    const deskScreen = seat ? getScreen(getDesk(seat)?.screenId ?? '') : undefined
+    const seatInfo = getSeat(seat)
+    const seatScreen = seatInfo?.screenId ? getScreen(seatInfo.screenId) : undefined
+    if (seatInfo && seatScreen && seatInfo.kind !== 'desk') {
+      // Seated in a room with a screen: over the shoulder, looking at the screen.
+      const [sx, sy, sz] = seatScreen.position
+      const dx = sx - seatInfo.x
+      const dz = sz - seatInfo.z
+      const len = Math.hypot(dx, dz) || 1
+      const back = Math.min(1.6, len * 0.4)
+      desired.set(seatInfo.x - (dx / len) * back, 1.8, seatInfo.z - (dz / len) * back)
+      lookAt.set(sx, sy - 0.1, sz)
+      camera.position.lerp(desired, 1 - Math.exp(-dt * 6))
+      camera.up.copy(up)
+      camera.lookAt(lookAt)
+      return
+    }
+    const deskScreen = seatInfo?.kind === 'desk' ? seatScreen : undefined
     if (deskScreen) {
       // Seated: look over the shoulder at the monitor.
       const [sx, sy, sz] = deskScreen.position

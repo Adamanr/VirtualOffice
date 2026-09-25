@@ -6,8 +6,12 @@ import { level } from '../lib/level'
  * Mutable, per-frame state of the local player. Kept outside React/zustand:
  * it changes every frame and is read by the camera, network and audio loops.
  */
+// Dev only: ?spawn=x,z starts somewhere else (the server rejects teleports once joined).
+const devSpawn = import.meta.env.DEV ? new URLSearchParams(location.search).get('spawn')?.split(',').map(Number) : undefined
+const [spawnX, spawnZ] = devSpawn?.length === 2 && devSpawn.every(Number.isFinite) ? devSpawn : level.spawn.position
+
 export const local = {
-  position: new THREE.Vector3(level.spawn.position[0], 0, level.spawn.position[1]),
+  position: new THREE.Vector3(spawnX, 0, spawnZ),
   rotY: level.spawn.rotationY,
   anim: Anim.idle as number,
   /** Set to force a teleport (server correction, sitting down/standing up). */

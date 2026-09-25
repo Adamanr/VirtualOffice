@@ -2,14 +2,15 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { onKey } from '../input/keyboard'
 import { canSeeScreen } from '../lib/audio'
-import { deskSeat, getDesk, level, zoneAt } from '../lib/level'
+import { getSeat, level, seats, zoneAt } from '../lib/level'
 import { openOverlay } from '../screens/actions'
-import { sit, standUp } from '../screens/desks'
+import { sit, standUp } from '../screens/seats'
 import { sameTarget, useGame, type Target } from '../store/game'
 import { local } from '../store/local'
 import { useScreens } from '../store/screens'
 
 const DESK_RANGE = 1.3
+const SEAT_RANGE = 0.9
 const INTERVAL = 0.1
 
 /** Finds what the player can interact with (E) and handles E / F / Esc. */
@@ -21,14 +22,14 @@ export function Interactions() {
       onKey('KeyE', () => {
         const { target, menuOpen, seat } = useGame.getState()
         if (!target) return
-        if (target.kind === 'desk' && !seat) sit(target.deskId)
+        if (target.kind === 'seat' && !seat) sit(target.seatId)
         else useGame.setState({ menuOpen: !menuOpen })
       }),
       onKey('KeyF', () => {
         const { overlay, states } = useScreens.getState()
         if (overlay) return useScreens.setState({ overlay: null })
         const { target, seat } = useGame.getState()
-        const id = target?.kind === 'screen' ? target.screenId : seat ? getDesk(seat)?.screenId : null
+        const id = target?.kind === 'screen' ? target.screenId : (getSeat(seat)?.screenId ?? null)
         if (id && states[id]) openOverlay(id)
       }),
       onKey('Escape', () => {
@@ -62,16 +63,17 @@ export function Interactions() {
 function findTarget(): Target | null {
   const { x, z } = local.position
   const seat = useGame.getState().seat
-  if (seat) return { kind: 'desk', deskId: seat }
+  if (seat) return { kind: 'seat', seatId: seat }
 
+  // A free seat right next to us wins (desks are reachable from a bit further away).
   let best: Target | null = null
-  let bestD = DESK_RANGE
-  for (const desk of level.desks) {
-    const s = deskSeat(desk)
+  let bestScore = Infinity
+  for (const s of seats) {
     const d = Math.hypot(s.x - x, s.z - z)
-    if (d < bestD) {
-      bestD = d
-      best = { kind: 'desk', deskId: desk.id }
+    const range = s.kind === 'desk' ? DESK_RANGE : SEAT_RANGE
+    if (d < range && d / range < bestScore) {
+      bestScore = d / range
+      best = { kind: 'seat', seatId: s.id }
     }
   }
   if (best) return best

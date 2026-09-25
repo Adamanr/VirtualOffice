@@ -14,6 +14,7 @@ import { Screens } from '../scene/Screens'
 import { InteractionMenu, InteractionPrompt, ScreenOverlay } from './ScreenUi'
 import '../screens/actions'
 import '../screens/pdfActions'
+import { ChatButton, ChatPanel, ReactionButtons } from './Chat'
 import { PdfDropZone, PdfHint, PdfMenuItems, PdfOverlay } from './PdfUi'
 import { navigate } from '../lib/route'
 import { LeaveIcon } from './icons'
@@ -63,7 +64,10 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       <PdfHint />
       <ScreenOverlay renderPdf={(id) => <PdfOverlay screenId={id} />} />
       <PdfDropZone />
+      <ChatPanel />
       <MediaControls>
+        <ReactionButtons />
+        <ChatButton />
         <button className="ctl danger" onClick={() => navigate('/')} title="Выйти">
           <LeaveIcon />
         </button>

@@ -97,6 +97,8 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
     if (v) {
       v.position.copy(local.position)
       v.rotation.y = local.rotY
+      // The desk camera sits where our head is.
+      v.visible = !seated
     }
   })
 

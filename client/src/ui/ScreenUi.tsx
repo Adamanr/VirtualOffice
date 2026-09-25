@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { getDesk, getScreen, screenLabel } from '../lib/level'
 import { closeOverlay, openOverlay, shareScreen, stopPresenting } from '../screens/actions'
+import { standUp } from '../screens/desks'
 import { useGame } from '../store/game'
 import { useMedia } from '../store/media'
 import { usePlayers } from '../store/players'
@@ -76,10 +77,11 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
   return (
     <div className="menu panel" onPointerDown={(e) => e.stopPropagation()}>
       <div className="menu-title">{screen ? screenLabel(screen) : 'Стол'}</div>
+      {screen?.kind === 'desk' && !state && <div className="muted small">Видят те, кто рядом (≈{screen.viewDistance ?? 6} м) — удобно для парного программирования</div>}
       {screen && !state && (
         <>
           <button className="btn" disabled={!mediaOk || !canShare} onClick={() => void shareScreen(screen.id)}>
-            🖥️ Показать экран
+            🖥️ {screen.kind === 'desk' ? 'Показать экран на мониторе' : 'Показать экран'}
           </button>
           {!mediaOk && <div className="muted small">Демонстрация недоступна: нет соединения с медиасервером</div>}
           {extra?.(screen.id)}
@@ -99,7 +101,7 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
         </button>
       )}
       {seat && (
-        <button className="btn" onClick={() => useGame.getState().setSeat(null)}>
+        <button className="btn" onClick={standUp}>
           🚶 Встать (Esc)
         </button>
       )}

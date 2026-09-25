@@ -2,8 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { onKey } from '../input/keyboard'
 import { canSeeScreen } from '../lib/audio'
-import { deskSeat, level, zoneAt } from '../lib/level'
+import { deskSeat, getDesk, level, zoneAt } from '../lib/level'
 import { openOverlay } from '../screens/actions'
+import { sit, standUp } from '../screens/desks'
 import { sameTarget, useGame, type Target } from '../store/game'
 import { local } from '../store/local'
 import { useScreens } from '../store/screens'
@@ -18,21 +19,29 @@ export function Interactions() {
   useEffect(() => {
     const offs = [
       onKey('KeyE', () => {
-        const { target, menuOpen } = useGame.getState()
+        const { target, menuOpen, seat } = useGame.getState()
         if (!target) return
-        useGame.setState({ menuOpen: !menuOpen })
+        if (target.kind === 'desk' && !seat) sit(target.deskId)
+        else useGame.setState({ menuOpen: !menuOpen })
       }),
       onKey('KeyF', () => {
         const { overlay, states } = useScreens.getState()
         if (overlay) return useScreens.setState({ overlay: null })
-        const target = useGame.getState().target
-        const id = target?.kind === 'screen' ? target.screenId : null
+        const { target, seat } = useGame.getState()
+        const id = target?.kind === 'screen' ? target.screenId : seat ? getDesk(seat)?.screenId : null
         if (id && states[id]) openOverlay(id)
       }),
       onKey('Escape', () => {
         if (useScreens.getState().overlay) useScreens.setState({ overlay: null })
         else if (useGame.getState().menuOpen) useGame.setState({ menuOpen: false })
+        else if (useGame.getState().seat) standUp()
       }),
+      // Walking away from a desk stands up.
+      ...['KeyW', 'KeyA', 'KeyS', 'KeyD'].map((code) =>
+        onKey(code, () => {
+          if (useGame.getState().seat && !useGame.getState().menuOpen) standUp()
+        }),
+      ),
     ]
     return () => offs.forEach((off) => off())
   }, [])

@@ -13,6 +13,9 @@ defmodule Office.Application do
       OfficeWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:office, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Office.PubSub},
+      OfficeWeb.Presence,
+      {Registry, keys: :unique, name: Office.SpaceRegistry},
+      {DynamicSupervisor, name: Office.SpaceSupervisor, strategy: :one_for_one},
       # Start a worker by calling: Office.Worker.start_link(arg)
       # {Office.Worker, arg},
       # Start to serve requests, typically the last entry

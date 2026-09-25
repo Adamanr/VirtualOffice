@@ -7,6 +7,10 @@ import { Scene } from '../scene/Scene'
 import { usePlayers } from '../store/players'
 import { useProfile } from '../store/profile'
 import { HelpHint, TopBar } from './Hud'
+import { MediaBanners, MediaControls, VideoTiles } from './MediaHud'
+import { MediaSync } from '../scene/MediaSync'
+import { navigate } from '../lib/route'
+import { LeaveIcon } from './icons'
 
 const JOIN_ERRORS: Record<string, string> = {
   full: 'В пространстве уже максимум участников (30).',
@@ -40,9 +44,17 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
     <div className="office">
       <Scene color={color} self={selfId ? <Nameplate id={selfId} /> : null}>
         <NetSync />
+        <MediaSync />
         <RemotePlayers />
       </Scene>
       <TopBar spaceId={spaceId} />
+      <VideoTiles />
+      <MediaBanners />
+      <MediaControls>
+        <button className="ctl danger" onClick={() => navigate('/')} title="Выйти">
+          <LeaveIcon />
+        </button>
+      </MediaControls>
       <HelpHint />
     </div>
   )

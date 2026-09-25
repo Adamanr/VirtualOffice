@@ -5,6 +5,7 @@
 const pressed = new Set<string>()
 type Handler = (e: KeyboardEvent) => void
 const handlers = new Map<string, Set<Handler>>()
+const upHandlers = new Map<string, Set<Handler>>()
 
 export function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -19,8 +20,13 @@ if (typeof window !== 'undefined') {
     pressed.add(e.code)
     if (first && !e.repeat) handlers.get(e.code)?.forEach((h) => h(e))
   })
-  window.addEventListener('keyup', (e) => pressed.delete(e.code))
-  window.addEventListener('blur', () => pressed.clear())
+  window.addEventListener('keyup', (e) => {
+    if (pressed.delete(e.code)) upHandlers.get(e.code)?.forEach((h) => h(e))
+  })
+  window.addEventListener('blur', () => {
+    for (const code of pressed) upHandlers.get(code)?.forEach((h) => h(new KeyboardEvent('keyup', { code })))
+    pressed.clear()
+  })
 }
 
 export const isDown = (code: string) => pressed.has(code)
@@ -29,10 +35,11 @@ export function clearKeys() {
   pressed.clear()
 }
 
-/** Subscribes to a key press (no auto-repeat). Returns an unsubscribe function. */
-export function onKey(code: string, handler: Handler): () => void {
-  let set = handlers.get(code)
-  if (!set) handlers.set(code, (set = new Set()))
+/** Subscribes to a key press (no auto-repeat), or release with `'up'`. Returns an unsubscribe function. */
+export function onKey(code: string, handler: Handler, phase: 'down' | 'up' = 'down'): () => void {
+  const map = phase === 'down' ? handlers : upHandlers
+  let set = map.get(code)
+  if (!set) map.set(code, (set = new Set()))
   set.add(handler)
   return () => set.delete(handler)
 }

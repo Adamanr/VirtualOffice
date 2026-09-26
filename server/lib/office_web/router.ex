@@ -9,6 +9,11 @@ defmodule OfficeWeb.Router do
     pipe_through :api
 
     get "/health", HealthController, :show
+    get "/offices", OfficeController, :index
+    post "/offices", OfficeController, :create
+    get "/offices/:id", OfficeController, :show
+    patch "/offices/:id", OfficeController, :update
+    delete "/offices/:id", OfficeController, :delete
     post "/uploads", UploadController, :create
     get "/uploads/:name", UploadController, :show
   end

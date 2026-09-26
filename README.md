@@ -5,7 +5,7 @@
 | Часть | Стек |
 |---|---|
 | `client/` | Vite, React 19, TypeScript (strict), React Three Fiber, drei, @react-three/rapier, zustand, phoenix.js, livekit-client, pdfjs-dist |
-| `server/` | Elixir, Phoenix 1.8: только API, Channels и Presence; состояние в памяти (GenServer на каждый space) |
+| `server/` | Elixir, Phoenix 1.8: только API, Channels и Presence; состояние в памяти (GenServer на каждый space), сохраняемые офисы — снимками на диск |
 | медиа | LiveKit (self-hosted SFU); Phoenix выдаёт JWT-токены (Joken, HS256) |
 | `browser/` | Node + headless Chromium (puppeteer-core): общий браузер на компьютерах офиса, картинка — screencast по WebSocket |
 | `infra/` | docker-compose: `livekit-server`, `phoenix`, `browser`, `caddy` (HTTPS, раздача клиента, reverse proxy) |
@@ -13,6 +13,7 @@
 
 ## Возможности
 
+- **Сохраняемые офисы.** На стартовой странице — список офисов: название, кто внутри сейчас (обновляется каждые 10 с) или когда там были в последний раз. Офис можно создать, переименовать ✏️ и удалить 🗑 (только пустой, с подтверждением). Всё, что в офисе оставили, ждёт следующего визита: рисунки на досках, стикеры, стэплер в желе, застрявший автомат, рекорды «Офисной олимпиады», дротики и чат. Не сохраняются занятые экраны (браузер, демонстрация, PDF принадлежат тому, кто показывает), партии в пинг-понг и учебная тревога. «⚡ Быстрая комната» по-прежнему даёт одноразовое пространство без сохранения; по ссылке `/s/<id>` можно войти в любое.
 - **Вход без регистрации**: имя, цвет аватара, выбор микрофона, камеры и динамиков с превью и индикатором уровня. Точка расширения под OAuth — `server/lib/office/auth.ex`.
 - **Офис в стиле сериала «Офис» из `level.json`**: open space с кубиклами на 24 стола, ресепшн, изолированные переговорная и кабинет регионального управляющего, актовый зал с экраном 5.6 м, комната отдыха. Мебель рисуется инстансингом (≈40 draw calls на весь уровень). Можно подставить `office.glb` из Blender (см. ниже).
 - **Управление**: WASD, Shift — бег, мышь — орбитальная камера с коллизией о стены, колесо — зум, Tab — вид сверху, E — действие, F — экран крупно, M/V — микрофон и камера, Enter — чат, 1–5 — реакции, пробел — push-to-talk (если включён).
@@ -124,6 +125,7 @@ Browser ◄──UDP 50000-60000 / TCP 7881 / TURN 3478──► LiveKit (мед
 ```
 
 - `Office.Space` (GenServer на каждый space, запускается по требованию, гаснет через минуту без людей): позиции, занятость экранов (`Office.Screens`), история чата (`Office.Chat`). Рассылает `batch` раз в 66 мс.
+- `Office.Offices` — список сохраняемых офисов (`DATA_DIR/offices.json`), REST: `GET/POST /api/offices`, `GET/PATCH/DELETE /api/offices/:id`. Для такого офиса `Office.Space` при старте читает снимок `DATA_DIR/spaces/<id>.bin` (`Office.SpaceStore`: `term_to_binary`, атомарная запись через временный файл), пишет его каждые 5 с, если что-то изменилось, и ещё раз при остановке — в том числе при перезапуске сервера. В dev данные лежат в `server/data/`, в Docker — в томе `offices`.
 - `OfficeWeb.SpaceChannel`: валидация (`Office.Protocol` из `shared/protocol.json`), rate limit (`Office.RateLimit`), санити-проверка движения (`Office.Movement`), зоны (`Office.Level` из `shared/level.json`), Presence, токены LiveKit (`Office.LiveKit`).
 - Клиент: мутабельное состояние, меняющееся каждый кадр (позиции, буферы интерполяции), живёт вне React (`store/local.ts`, `net/remotes.ts`); zustand хранит то, что показывает UI. Медиа-логика — `media/media.ts`, чистые функции слышимости — `lib/audio.ts`, интерполяция — `lib/interpolation.ts`.
 
@@ -310,4 +312,4 @@ docker compose up -d --build
 - OAuth (Google): `/api/auth/google/callback` → `Phoenix.Token` → параметр `auth` при join → проверка в `Office.Auth`.
 - GLB-аватары с анимациями idle/walk/run (Quaternius/Kenney + Mixamo): точка встраивания — `client/src/scene/Avatar.tsx`, сетевое `anim` уже передаётся.
 - Видео-текстура камеры над головой, звук демонстрации экрана, запись встреч (LiveKit Egress).
-- Хранение PDF в S3, персистентный чат, несколько узлов (Presence и PubSub уже кластерные; Space-процессы надо будет распределить через `:global`/Horde).
+- Хранение PDF в S3, права на офисы (владелец, приглашения) вместе с OAuth, несколько узлов (Presence и PubSub уже кластерные; Space-процессы надо будет распределить через `:global`/Horde).

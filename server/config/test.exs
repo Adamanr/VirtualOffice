@@ -20,3 +20,5 @@ config :phoenix,
 config :office, browser_notify: false
 
 config :office, uploads_dir: Path.join(System.tmp_dir!(), "office_uploads_test")
+
+config :office, data_dir: Path.join(System.tmp_dir!(), "office_data_test")

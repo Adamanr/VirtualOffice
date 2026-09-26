@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getZone, level } from '../lib/level'
+import { useOffice } from '../lib/offices'
 import { useGame } from '../store/game'
 import { usePlayers } from '../store/players'
 
@@ -35,11 +36,16 @@ export function TopBar({ spaceId }: { spaceId: string }) {
   const online = usePlayers((s) => Object.keys(s.players).length)
   const [showRoster, setShowRoster] = useState(false)
   const zone = getZone(zoneId)
+  const office = useOffice(spaceId)
   return (
     <div className="topbar">
       <div className="panel topbar-info">
-        <strong>{level.name}</strong>
-        <span className="muted">· {spaceId}</span>
+        <strong title={office ? 'Сохраняемый офис: всё остаётся на месте' : undefined}>{office?.name ?? level.name}</strong>
+        {office === null && (
+          <span className="muted" title="Быстрая комната: ничего не сохраняется, когда все выйдут">
+            · {spaceId}
+          </span>
+        )}
         {zone && (
           <span className={`zone-badge${zone.isolated ? ' isolated' : ''}`} title={zone.isolated ? 'Изолированная зона: слышно только тех, кто внутри' : 'Пространственный звук'}>
             {zone.name}

@@ -28,6 +28,20 @@ kbd { font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12); bo
 .card h1, .card h2 { margin: 0; }
 .card p { margin: 0; line-height: 1.45; }
 .card.lobby { width: min(560px, 100%); }
+
+/* Start menu: saved offices */
+.card.offices-card { width: min(560px, 100%); }
+.offices-title { font-size: 16px; margin-top: 4px !important; }
+.offices-error { color: #fca5a5; font-size: 13px; }
+.offices-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 42vh; overflow-y: auto; }
+.office-row { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; padding: 4px 4px 4px 0; }
+.office-row:hover { border-color: rgba(79,140,255,0.5); }
+.office-open { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: none; border: 0; color: var(--text); text-align: left; padding: 6px 12px; cursor: pointer; font: inherit; }
+.office-name { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.office-online { color: #4ade80; }
+.office-rename { flex: 1; padding-left: 8px; }
+.offices-card > .btn.ghost.small { align-self: center; }
+.lobby-back { align-self: flex-start; margin: -10px 0 -6px -8px; }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
 .input, select.input { width: 100%; background: #0f131a; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; font: inherit; font-size: 14px; outline: none; }
 .input:focus { border-color: var(--accent); }

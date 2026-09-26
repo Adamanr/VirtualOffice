@@ -33,8 +33,11 @@ services:
       BROWSER_SECRET: ${BROWSER_SECRET}
       LEVEL_PATH: /app/shared/level.json
       UPLOADS_DIR: /data/uploads
+      # Saved offices (list + each office's whiteboards, stickers, scores, chat…).
+      DATA_DIR: /data/offices
     volumes:
       - uploads:/data/uploads
+      - offices:/data/offices
     restart: unless-stopped
 
   # Headless Chromium for "open any site" on office computers. Its traffic goes
@@ -73,6 +76,7 @@ services:
 
 volumes:
   uploads:
+  offices:
   extensions:
   caddy_data:
   caddy_config:

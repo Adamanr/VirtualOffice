@@ -25,6 +25,7 @@ config :office, OfficeWeb.Endpoint,
 
 if path = System.get_env("LEVEL_PATH"), do: config(:office, :level_path, path)
 if dir = System.get_env("UPLOADS_DIR"), do: config(:office, :uploads_dir, dir)
+if dir = System.get_env("DATA_DIR"), do: config(:office, :data_dir, dir)
 
 if url = System.get_env("BROWSER_INTERNAL_URL"), do: config(:office, :browser_internal_url, url)
 

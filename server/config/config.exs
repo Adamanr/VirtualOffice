@@ -11,6 +11,8 @@ config :office,
   generators: [timestamp_type: :utc_datetime],
   level_path: Path.expand("../../shared/level.json", __DIR__),
   uploads_dir: Path.join(System.tmp_dir!(), "office_uploads"),
+  # Saved offices: the list and each office's snapshot (DATA_DIR in production).
+  data_dir: Path.expand("../data", __DIR__),
   max_players_per_space: 30,
   # Shared browser service (browser/): HMAC secret for its access tokens.
   browser_secret: "dev-browser-secret",

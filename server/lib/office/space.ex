@@ -4,18 +4,45 @@ defmodule Office.Space do
   all in memory. Channel processes push validated updates here; the space
   broadcasts changed player states as one `batch` message per tick (~15 Hz)
   and frees a player's screens when their channel process goes down.
+
+  A saved office (listed in `Office.Offices`) also keeps what people leave
+  behind — whiteboards, stickers, the jello prank, the vending machine, scores,
+  darts and chat — in `Office.SpaceStore`: loaded on start, written every few
+  seconds when it changed and once more when the process stops.
   """
 
   use GenServer, restart: :transient
+  require Logger
 
   alias Office.{Annotations, Chat, Darts, Drill, Level, Pong, Props, Scores, Screens, Toss}
 
   @tick_ms 66
   @idle_shutdown_ms 60_000
+  @save_ms 5_000
 
   # --- API
 
   def start_link(space_id), do: GenServer.start_link(__MODULE__, space_id, name: via(space_id))
+
+  @doc "Stops a running space (saving it first). No-op if it isn't running."
+  def stop(space_id) do
+    case Registry.lookup(Office.SpaceRegistry, space_id) do
+      [{pid, _}] -> GenServer.stop(pid, :normal)
+      [] -> :ok
+    end
+  catch
+    :exit, _ -> :ok
+  end
+
+  @doc "Players inside right now (0 when the space isn't running)."
+  def online(space_id) do
+    case Registry.lookup(Office.SpaceRegistry, space_id) do
+      [{pid, _}] -> GenServer.call(pid, :online)
+      [] -> 0
+    end
+  catch
+    :exit, _ -> 0
+  end
 
   defp via(space_id), do: {:via, Registry, {Office.SpaceRegistry, space_id}}
 
@@ -84,12 +111,19 @@ defmodule Office.Space do
   def annotate(space_id, player_id, screen_id, op, arg),
     do: call(space_id, {:annotate, player_id, screen_id, op, arg})
 
-  # Starts the space on demand; retries once if it was just shutting down.
-  defp call(space_id, msg, retry \\ true) do
+  # Starts the space on demand. If it was just shutting down, the registry may
+  # still point at the old process for a moment: retry a few times.
+  defp call(space_id, msg, attempts \\ 5) do
     ensure_started(space_id)
     GenServer.call(via(space_id), msg)
   catch
-    :exit, _ when retry -> call(space_id, msg, false)
+    :exit, {:noproc, _} when attempts > 1 ->
+      Process.sleep(10)
+      call(space_id, msg, attempts - 1)
+
+    :exit, {:normal, _} when attempts > 1 ->
+      Process.sleep(10)
+      call(space_id, msg, attempts - 1)
   end
 
   defp ensure_started(space_id) do
@@ -103,25 +137,34 @@ defmodule Office.Space do
 
   @impl true
   def init(space_id) do
+    # terminate/2 runs on shutdown too: the last changes get saved.
+    Process.flag(:trap_exit, true)
     level = Level.get()
     :timer.send_interval(@tick_ms, :tick)
+    saved? = Office.Offices.saved?(space_id)
+    if saved?, do: :timer.send_interval(@save_ms, :save)
 
-    {:ok,
-     %{
-       id: space_id,
-       level: level,
-       players: %{},
-       screens: Screens.new(level),
-       props: Props.new(level),
-       scores: Scores.new(),
-       drill: Drill.new(),
-       pongs:
-         for({id, %{type: "pingpong_table"}} <- level.props, into: %{}, do: {id, Pong.new(id)}),
-       darts: %{},
-       annots: Annotations.new(),
-       chat: Chat.new(),
-       idle_timer: schedule_idle(nil)
-     }}
+    state =
+      %{
+        id: space_id,
+        level: level,
+        players: %{},
+        screens: Screens.new(level),
+        props: Props.new(level),
+        scores: Scores.new(),
+        drill: Drill.new(),
+        pongs:
+          for({id, %{type: "pingpong_table"}} <- level.props, into: %{}, do: {id, Pong.new(id)}),
+        darts: %{},
+        annots: Annotations.new(),
+        chat: Chat.new(),
+        idle_timer: schedule_idle(nil),
+        saved?: saved?,
+        persisted: nil
+      }
+
+    state = if saved?, do: restore(state, Office.SpaceStore.load(space_id)), else: state
+    {:ok, %{state | persisted: persisted(state)}}
   end
 
   @impl true
@@ -181,6 +224,8 @@ defmodule Office.Space do
         {:reply, {:error, reason}, state}
     end
   end
+
+  def handle_call(:online, _from, state), do: {:reply, map_size(state.players), state}
 
   def handle_call({:screen_state, screen_id}, _from, state),
     do: {:reply, Map.get(state.screens, screen_id), state}
@@ -439,6 +484,78 @@ defmodule Office.Space do
 
   def handle_info(:idle_shutdown, state) do
     if state.players == %{}, do: {:stop, :normal, state}, else: {:noreply, state}
+  end
+
+  def handle_info(:save, state), do: {:noreply, save(state)}
+
+  @impl true
+  def terminate(_reason, state) do
+    save(state)
+    :ok
+  end
+
+  # --- persistence
+
+  # What a saved office keeps between visits. Busy appliances, screens, games in
+  # progress and the fire drill are moments, not state.
+  defp persisted(state) do
+    %{
+      props: Map.take(state.props, [:boards, :stickers, :vending, :jello]),
+      scores: state.scores,
+      darts: state.darts,
+      chat: state.chat.messages
+    }
+  end
+
+  defp save(%{saved?: false} = state), do: state
+
+  defp save(state) do
+    data = persisted(state)
+
+    if data == state.persisted do
+      state
+    else
+      case Office.SpaceStore.save(state.id, data) do
+        :ok ->
+          Office.Offices.touch(state.id)
+          %{state | persisted: data}
+
+        {:error, reason} ->
+          Logger.error("saving office #{state.id} failed: #{inspect(reason)}")
+          state
+      end
+    end
+  end
+
+  defp restore(state, nil), do: state
+
+  defp restore(state, saved) do
+    sp = Map.get(saved, :props, %{})
+    props = state.props
+    # Only what still exists in the level (it may have been edited since).
+    vending =
+      Map.merge(props.vending, Map.take(Map.get(sp, :vending, %{}), Map.keys(props.vending)))
+
+    known = fn map -> Map.filter(map, fn {id, _} -> Map.has_key?(state.level.props, id) end) end
+
+    props = %{
+      props
+      | boards: known.(Map.get(sp, :boards, %{})),
+        stickers: known.(Map.get(sp, :stickers, %{})),
+        jello:
+          Map.filter(Map.get(sp, :jello, %{}), fn {id, _} ->
+            Map.has_key?(state.level.desks, id)
+          end),
+        vending: vending
+    }
+
+    %{
+      state
+      | props: props,
+        scores: Map.get(saved, :scores, state.scores),
+        darts: known.(Map.get(saved, :darts, %{})),
+        chat: %{state.chat | messages: Map.get(saved, :chat, [])}
+    }
   end
 
   defp annotate(state, player_id, screen_id, op, arg, presenter?) do

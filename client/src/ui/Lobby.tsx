@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useOffice } from '../lib/offices'
+import { navigate } from '../lib/route'
 import { media } from '../media/media'
 import { AVATAR_COLORS, useProfile } from '../store/profile'
 import { DeviceSelect, useDevices } from './DeviceSelect'
@@ -34,6 +36,7 @@ function useMicLevel(stream: MediaStream | null) {
 /** Entry screen: name, avatar color, microphone/camera choice with a live preview. */
 export function Lobby({ spaceId, onEnter }: { spaceId: string; onEnter: () => void }) {
   const profile = useProfile()
+  const office = useOffice(spaceId)
   const [name, setName] = useState(profile.name)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [mediaError, setMediaError] = useState<string | null>(null)
@@ -102,7 +105,11 @@ export function Lobby({ spaceId, onEnter }: { spaceId: string; onEnter: () => vo
           enter()
         }}
       >
-        <h2>Вход в пространство</h2>
+        <button type="button" className="btn ghost small lobby-back" onClick={() => navigate('/')}>
+          ← Все офисы
+        </button>
+        <h2>{office ? `Вход в офис «${office.name}»` : 'Вход в пространство'}</h2>
+        {office === null && <p className="muted small">Быстрая комната: ничего не сохраняется, когда все выйдут. Сохраняемый офис создаётся в меню.</p>}
         <p className="muted small">
           Ссылка для коллег: <code>{location.origin}/s/{spaceId}</code>
         </p>

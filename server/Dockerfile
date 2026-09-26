@@ -24,5 +24,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /app
 COPY --from=build /app/server/_build/prod/rel/office ./rel
 COPY shared /app/shared
-RUN mkdir -p /data/uploads
+RUN mkdir -p /data/uploads /data/offices
 CMD ["/app/rel/bin/office", "start"]

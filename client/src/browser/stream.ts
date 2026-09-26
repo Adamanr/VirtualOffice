@@ -3,10 +3,28 @@ import { getConnection } from '../net/session'
 
 import { VIEWPORT } from './input'
 import { TabAudio } from './audio'
+import { notify } from '../store/game'
 
 export { VIEWPORT }
 
+export interface BrowserTab {
+  id: string
+  title: string
+  url: string
+}
+
+export interface BrowserExtension {
+  id: string
+  name: string
+  version: string
+  popup: boolean
+  options: boolean
+}
+
 export interface BrowserInfo {
+  tabs: BrowserTab[]
+  activeTab: string | null
+  extensions: BrowserExtension[]
   url: string
   title: string
   loading: boolean
@@ -80,7 +98,7 @@ class BrowserStream {
 
   private patch(p: Partial<BrowserInfo>) {
     useBrowsers.setState((s) => ({
-      [this.screenId]: { url: '', title: '', loading: false, fullscreen: false, control: false, status: 'connecting', error: null, ...s[this.screenId], ...p },
+      [this.screenId]: { url: '', title: '', loading: false, fullscreen: false, control: false, status: 'connecting', error: null, tabs: [], activeTab: null, extensions: [], ...s[this.screenId], ...p },
     }))
   }
 
@@ -108,12 +126,36 @@ class BrowserStream {
     ws.onmessage = (e) => {
       if (typeof e.data === 'string') {
         try {
-          const msg = JSON.parse(e.data) as { t: string; url?: string; title?: string; loading?: boolean; fullscreen?: boolean; message?: string; x?: number; y?: number }
+          const msg = JSON.parse(e.data) as {
+            t: string
+            url?: string
+            title?: string
+            loading?: boolean
+            fullscreen?: boolean
+            message?: string
+            x?: number
+            y?: number
+            tabs?: BrowserTab[]
+            activeTab?: string | null
+            extensions?: BrowserExtension[]
+          }
           if (msg.t === 'cursor' && !useBrowsers.getState()[this.screenId]?.control) {
             this.cursor.x = msg.x ?? this.cursor.x
             this.cursor.y = msg.y ?? this.cursor.y
           }
-          if (msg.t === 'info') this.patch({ url: msg.url ?? '', title: msg.title ?? '', loading: !!msg.loading, fullscreen: !!msg.fullscreen, status: 'live', error: null })
+          if (msg.t === 'info')
+            this.patch({
+              url: msg.url ?? '',
+              title: msg.title ?? '',
+              loading: !!msg.loading,
+              fullscreen: !!msg.fullscreen,
+              tabs: msg.tabs ?? [],
+              activeTab: msg.activeTab ?? null,
+              extensions: msg.extensions ?? [],
+              status: 'live',
+              error: null,
+            })
+          if (msg.t === 'notice' && msg.message) notify(msg.message)
           if (msg.t === 'error') this.patch({ error: msg.message ?? 'Ошибка' })
         } catch {
           /* ignore */

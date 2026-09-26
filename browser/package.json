@@ -12,6 +12,7 @@
     "test": "node --test test/"
   },
   "dependencies": {
+    "adm-zip": "^0.6.1",
     "puppeteer-core": "^25.12.0",
     "ws": "^8.21.3"
   }

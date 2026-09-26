@@ -92,6 +92,18 @@ function install(screenId: string, canvas: HTMLCanvasElement, onError: () => voi
   }
   const key = (type: 'keyDown' | 'keyUp') => (e: KeyboardEvent) => {
     if (e.isComposing || e.key === 'Escape') return
+    // Tabs: Alt+T new, Alt+W close, Alt+, / Alt+. previous / next (Ctrl+T/W belong to your own browser).
+    if (e.altKey && !e.ctrlKey && ['KeyT', 'KeyW', 'Comma', 'Period'].includes(e.code)) {
+      e.preventDefault()
+      e.stopPropagation()
+      if (type === 'keyDown' && !e.repeat) {
+        if (e.code === 'KeyT') stream.send({ t: 'tab_new' })
+        if (e.code === 'KeyW') stream.send({ t: 'tab_close' })
+        if (e.code === 'Comma') stream.send({ t: 'tab_switch', delta: -1 })
+        if (e.code === 'Period') stream.send({ t: 'tab_switch', delta: 1 })
+      }
+      return
+    }
     if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') return // let the paste event through
     e.preventDefault()
     e.stopPropagation()

@@ -5,6 +5,7 @@ import { useScreens } from '../store/screens'
 import { openBrowser } from './actions'
 import { modifiers, toPage } from './input'
 import { browserStream, collapsePage, useBrowsers } from './stream'
+import { ExtensionsPanel, TabsBar } from './TabsBar'
 
 /** Real fullscreen for the 2D browser window (anyone watching). */
 function toggleFullscreen() {
@@ -45,6 +46,7 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
   const host = useRef<HTMLDivElement>(null)
   const [address, setAddress] = useState('')
   const [editing, setEditing] = useState(false)
+  const [extOpen, setExtOpen] = useState(false)
   const stream = browserStream(screenId)
   const control = !!info?.control
 
@@ -167,6 +169,7 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
 
   return (
     <div className="browser">
+      <TabsBar screenId={screenId} control={control} />
       <form
         className="browser-bar"
         onSubmit={(e) => {
@@ -200,6 +203,11 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
         <button type="button" className="btn small" onClick={toggleFullscreen} title="На весь экран браузера">
           ⛶
         </button>
+        {control && (
+          <button type="button" className={`btn small${extOpen ? ' active' : ''}`} onClick={() => setExtOpen((v) => !v)} title="Расширения">
+            🧩
+          </button>
+        )}
         {control && info?.fullscreen && (
           <button type="button" className="btn small" onClick={() => collapsePage(screenId)} title="Свернуть видео на странице">
             🗗
@@ -207,6 +215,7 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
         )}
         <span className="muted small browser-who">{control ? 'Вы управляете · видят все рядом' : `Смотрите · управляет ${ownerName ?? '…'}`}</span>
       </form>
+      {extOpen && control && <ExtensionsPanel screenId={screenId} onClose={() => setExtOpen(false)} />}
       <div ref={host} className="browser-view">
         {(status || info?.error) && <div className="browser-status">{status ?? info?.error}</div>}
       </div>

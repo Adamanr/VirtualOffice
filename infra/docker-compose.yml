@@ -49,6 +49,10 @@ services:
       PORT: 4100
       BROWSER_SECRET: ${BROWSER_SECRET}
       MAX_SESSIONS: ${BROWSER_MAX_SESSIONS:-6}
+      # Chrome Web Store extensions installed by people in the office (0 = off).
+      EXTENSIONS: ${BROWSER_EXTENSIONS:-1}
+    volumes:
+      - extensions:/data/extensions
     shm_size: 1gb
     restart: unless-stopped
 
@@ -69,5 +73,6 @@ services:
 
 volumes:
   uploads:
+  extensions:
   caddy_data:
   caddy_config:

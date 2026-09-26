@@ -72,7 +72,9 @@ export async function resolvePublic(host, { allowPrivate = false } = {}) {
   }
   if (addrs.length === 0) return null
   if (!allowPrivate && addrs.some((a) => isBlockedIp(a.address))) return null
-  return addrs[0].address
+  // Prefer IPv4: many hosts (and containers) have no working IPv6 route, and a
+  // dead AAAA first would make streaming sites fail with "something went wrong".
+  return (addrs.find((a) => a.family === 4) ?? addrs[0]).address
 }
 
 /** Only web pages: http(s). No file:, chrome:, javascript:, data: navigations. */

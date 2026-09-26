@@ -227,3 +227,18 @@ kbd { font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12); bo
 /* Inside a browser screen: only the 3D view, the hint and the cinema stay. */
 .office.in-screen > :not(:first-child):not(.focus-hint):not(.cinema) { display: none !important; }
 .office.in-screen .nameplate { display: none; }
+
+/* Browser tabs & extensions */
+.browser-tabs { display: flex; gap: 4px; align-items: center; overflow-x: auto; min-height: 30px; }
+.browser-tab { display: flex; align-items: center; gap: 4px; max-width: 200px; padding: 4px 6px 4px 10px; border-radius: 8px 8px 0 0; background: rgba(255,255,255,0.06); font-size: 12px; cursor: pointer; flex: none; }
+.browser-tab.active { background: rgba(79,140,255,0.28); }
+.browser-tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.browser-tab-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 2px; }
+.browser-tab-x:hover { color: var(--text); }
+.browser-ext { position: absolute; right: 16px; top: 110px; z-index: 60; width: min(420px, calc(100% - 32px)); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.browser-ext-row { gap: 6px; font-size: 13px; }
+.btn.active { background: var(--accent); color: #fff; }
+.focus-tabs { display: flex; gap: 8px; justify-content: center; margin-top: 4px; font-size: 12px; opacity: 0.85; }
+.focus-tabs .active { color: #ffd84a; font-weight: 600; }
+.focus-keys { font-size: 11px; opacity: 0.7; margin-top: 2px; text-align: center; }
+.focus-hint { white-space: normal; text-align: center; max-width: calc(100% - 24px); }

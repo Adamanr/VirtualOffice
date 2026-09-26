@@ -13,6 +13,18 @@ function FocusHint() {
     <div className="focus-hint">
       🖱 Вы в экране{info?.title ? ` · ${info.title}` : ''} — мышь и клавиатура управляют страницей · <kbd>Esc</kbd> — обратно в офис
       {info?.fullscreen ? ' (видео останется на весь экран)' : ''}
+      {info && info.tabs.length > 1 && (
+        <div className="focus-tabs">
+          {info.tabs.map((t, i) => (
+            <span key={t.id} className={t.id === info.activeTab ? 'active' : ''}>
+              {i + 1}. {(t.title || t.url).slice(0, 24)}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="focus-keys">
+        <kbd>Alt+T</kbd> новая вкладка · <kbd>Alt+W</kbd> закрыть · <kbd>Alt+,</kbd>/<kbd>Alt+.</kbd> переключить
+      </div>
     </div>
   )
 }

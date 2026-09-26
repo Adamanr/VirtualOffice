@@ -4,6 +4,7 @@ import puppeteer from 'puppeteer-core'
 import { WebSocketServer } from 'ws'
 import { startProxy } from './proxy.mjs'
 import { BrowserSession } from './session.mjs'
+import { ExtensionStore } from './extensions.mjs'
 import { verify } from './token.mjs'
 
 const PORT = Number(process.env.PORT ?? 4100)
@@ -11,6 +12,8 @@ const SECRET = process.env.BROWSER_SECRET ?? (process.env.NODE_ENV === 'producti
 const MAX_SESSIONS = Number(process.env.MAX_SESSIONS ?? 6)
 const ALLOW_PRIVATE = process.env.ALLOW_PRIVATE === '1'
 const IDLE_MS = Number(process.env.IDLE_MS ?? 30 * 60_000)
+// Office-wide extensions from the Chrome Web Store (EXTENSIONS=0 turns the feature off).
+const extensions = process.env.EXTENSIONS === '0' ? null : new ExtensionStore(process.env.EXTENSIONS_DIR ?? '/tmp/office-extensions', (...a) => log(...a))
 const CHROMIUM =
   process.env.CHROMIUM_PATH ??
   ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'].find((p) => existsSync(p))
@@ -18,6 +21,7 @@ const CHROMIUM =
 if (!SECRET) throw new Error('BROWSER_SECRET is required')
 const log = (...args) => console.log(new Date().toISOString(), ...args)
 
+await extensions?.ready
 const proxy = await startProxy({ allowPrivate: ALLOW_PRIVATE, log })
 const proxyPort = proxy.address().port
 
@@ -31,8 +35,12 @@ function launch({ env }) {
     env,
     // We set the page size ourselves (see BrowserSession.applyQuality).
     defaultViewport: null,
-    // Puppeteer mutes headless Chromium by default; we capture the tab's sound.
-    ignoreDefaultArgs: ['--mute-audio'],
+    // Puppeteer mutes headless Chromium by default (we capture the tab's sound)
+    // and flags it as automated (sites like YouTube then refuse to play).
+    ignoreDefaultArgs: ['--mute-audio', '--enable-automation'],
+    // Extensions are loaded over CDP (Extensions.loadUnpacked needs a pipe).
+    enableExtensions: !!extensions,
+    pipe: true,
     args: [
       `--proxy-server=http://127.0.0.1:${proxyPort}`,
       // Force even localhost through the proxy (Chromium bypasses loopback by default).
@@ -40,7 +48,8 @@ function launch({ env }) {
       '--no-sandbox',
       '--disable-dev-shm-usage',
       '--autoplay-policy=no-user-gesture-required',
-      '--disable-extensions',
+      '--disable-blink-features=AutomationControlled',
+      ...(extensions ? ['--enable-unsafe-extension-debugging'] : []),
       '--disable-background-networking',
       '--disable-sync',
       '--no-first-run',
@@ -59,7 +68,7 @@ async function sessionFor(claim) {
   if (!claim.c) return null // only the presenter starts a browser
   if (existing) await existing.close()
   if (sessions.size >= MAX_SESSIONS) throw new Error('busy')
-  const session = new BrowserSession(launch, { screenId: claim.s, key: claim.k, startUrl: claim.u, log, audio: AUDIO })
+  const session = new BrowserSession(launch, { screenId: claim.s, key: claim.k, startUrl: claim.u, log, audio: AUDIO, extensions })
   sessions.set(claim.s, session)
   try {
     await session.start()
@@ -69,6 +78,29 @@ async function sessionFor(claim) {
     throw e
   }
   return session
+}
+
+/** Installing/removing an extension applies to every running shared browser. */
+function extensionHooks(session) {
+  if (!extensions) return {}
+  return {
+    async installExtension(input) {
+      try {
+        const ext = await extensions.install(input, session.chromeVersion)
+        for (const s of sessions.values()) {
+          if (!s.runtimeIds.has(ext.id)) await s.loadExtension(ext)
+          s.sendInfo()
+        }
+        session.send({ t: 'notice', message: `Расширение «${ext.name}» установлено для всех браузеров офиса` })
+      } catch (e) {
+        session.send({ t: 'error', message: e.message })
+      }
+    },
+    async removeExtension(id) {
+      await extensions.remove(id)
+      for (const s of sessions.values()) await s.unloadExtension(id)
+    },
+  }
 }
 
 /** Phoenix tells us when a screen's browser ended (released, taken over, owner left). */
@@ -142,7 +174,7 @@ async function onConnection(ws, claim) {
     } catch {
       return
     }
-    void session.handle(msg, claim.c === true, ws)
+    void session.handle(msg, claim.c === true, ws, extensionHooks(session))
   })
   ws.on('close', () => {
     clearInterval(refill)

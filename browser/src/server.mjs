@@ -10,6 +10,7 @@ const PORT = Number(process.env.PORT ?? 4100)
 const SECRET = process.env.BROWSER_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'dev-browser-secret')
 const MAX_SESSIONS = Number(process.env.MAX_SESSIONS ?? 6)
 const ALLOW_PRIVATE = process.env.ALLOW_PRIVATE === '1'
+const IDLE_MS = Number(process.env.IDLE_MS ?? 30 * 60_000)
 const CHROMIUM =
   process.env.CHROMIUM_PATH ??
   ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'].find((p) => existsSync(p))
@@ -65,7 +66,34 @@ async function sessionFor(claim) {
   return session
 }
 
+/** Phoenix tells us when a screen's browser ended (released, taken over, owner left). */
+async function closeRequest(req, res) {
+  let body = ''
+  for await (const chunk of req) {
+    body += chunk
+    if (body.length > 8192) return res.writeHead(413).end()
+  }
+  let claim = null
+  try {
+    claim = verify(JSON.parse(body).token, SECRET)
+  } catch {
+    /* bad json */
+  }
+  if (!claim || claim.k !== '*close*') return res.writeHead(401).end()
+  const session = sessions.get(claim.s)
+  if (session) {
+    sessions.delete(claim.s)
+    await session.close()
+    log('closed by office', claim.s)
+  }
+  res.writeHead(204).end()
+}
+
 const server = http.createServer((req, res) => {
+  if (req.method === 'POST' && req.url === '/browser/close') {
+    void closeRequest(req, res)
+    return
+  }
   if (req.url === '/browser/health') {
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, sessions: sessions.size, chromium: !!CHROMIUM }))
     return
@@ -113,10 +141,14 @@ async function onConnection(ws, claim) {
   })
   ws.on('close', () => {
     clearInterval(refill)
-    session.removeViewer(ws, () => {
-      if (sessions.get(session.screenId) === session) sessions.delete(session.screenId)
-      void session.close()
-    })
+    session.removeViewer(
+      ws,
+      () => {
+        if (sessions.get(session.screenId) === session) sessions.delete(session.screenId)
+        void session.close()
+      },
+      IDLE_MS,
+    )
   })
 }
 

@@ -20,7 +20,7 @@ defmodule Office.MixProject do
   def application do
     [
       mod: {Office.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :inets]
     ]
   end
 

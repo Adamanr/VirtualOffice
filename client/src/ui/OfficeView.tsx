@@ -27,6 +27,7 @@ import { PianoKeys } from '../scene/PianoKeys'
 import '../activities/games'
 import { BrowserMenuItem, BrowserOverlay } from '../browser/BrowserUi'
 import { TabHud } from '../browser/TabHud'
+import { Cinema } from '../browser/Cinema'
 import { InteractionMenu, InteractionPrompt, ScreenOverlay } from './ScreenUi'
 import { IntranetMenuItem, PropMenu, PropOverlays, PropPrompt } from './PropUi'
 import '../screens/actions'
@@ -106,6 +107,7 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       <ActivityHud />
       <GameHud />
       <TabHud />
+      <Cinema />
       <PdfHint />
       <ScreenOverlay renderPdf={(id) => <PdfOverlay screenId={id} />} renderBrowser={(id) => <BrowserOverlay screenId={id} />} />
       <PropOverlays />

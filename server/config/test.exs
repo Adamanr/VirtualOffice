@@ -17,4 +17,6 @@ config :phoenix, :plug_init_mode, :runtime
 config :phoenix,
   sort_verified_routes_query_params: true
 
+config :office, browser_notify: false
+
 config :office, uploads_dir: Path.join(System.tmp_dir!(), "office_uploads_test")

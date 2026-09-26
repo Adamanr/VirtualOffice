@@ -22,7 +22,7 @@ export class BrowserSession {
     this.log = log ?? (() => {})
     this.viewers = new Set()
     this.lastFrame = null
-    this.info = { t: 'info', url: startUrl, title: '', loading: true }
+    this.info = { t: 'info', url: startUrl, title: '', loading: true, fullscreen: false }
     this.mouse = { buttons: 0 }
     this.closed = false
     this.idleTimer = null
@@ -51,6 +51,11 @@ export class BrowserSession {
     await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 62, maxWidth: VIEWPORT.width, maxHeight: VIEWPORT.height, everyNthFrame: 1 })
 
     page.on('dialog', (d) => d.dismiss().catch(() => {}))
+    // Tell viewers when the page goes fullscreen (e.g. a video's ⛶ button), even inside iframes.
+    await page.exposeFunction('__officeFullscreen', (on) => this.setInfo({ fullscreen: !!on })).catch(() => {})
+    await page.evaluateOnNewDocument(() => {
+      document.addEventListener('fullscreenchange', () => window.__officeFullscreen?.(!!document.fullscreenElement), true)
+    })
     // target=_blank / window.open: keep everything in this one shared tab.
     page.on('popup', async (popup) => {
       const url = popup?.url()
@@ -58,7 +63,7 @@ export class BrowserSession {
       if (url && url !== 'about:blank') this.navigate(url)
     })
     page.on('framenavigated', (frame) => {
-      if (frame === page.mainFrame()) this.setInfo({ url: frame.url(), loading: true })
+      if (frame === page.mainFrame()) this.setInfo({ url: frame.url(), loading: true, fullscreen: false })
     })
     page.on('load', async () => this.setInfo({ title: await page.title().catch(() => ''), loading: false }))
     await this.navigate(this.startUrl)
@@ -100,6 +105,8 @@ export class BrowserSession {
         return this.page.goForward({ timeout: 10000 }).catch(() => {})
       case 'reload':
         return this.page.reload({ timeout: 20000 }).catch(() => {})
+      case 'exitFullscreen':
+        return this.page.evaluate(() => document.fullscreenElement && document.exitFullscreen()).catch(() => {})
       default: {
         const cmd = toCdp(msg, this.mouse)
         if (!cmd) return
@@ -125,9 +132,13 @@ export class BrowserSession {
     if (this.lastFrame) ws.send(this.lastFrame)
   }
 
-  removeViewer(ws, onIdle) {
+  /**
+   * The tab keeps playing with nobody watching (the presenter may walk away);
+   * Phoenix closes it when the screen is released. This is only a safety net.
+   */
+  removeViewer(ws, onIdle, idleMs) {
     this.viewers.delete(ws)
-    if (this.viewers.size === 0) this.idleTimer = setTimeout(onIdle, 60_000)
+    if (this.viewers.size === 0) this.idleTimer = setTimeout(onIdle, idleMs)
   }
 
   send(msg) {

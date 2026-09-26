@@ -166,6 +166,7 @@ defmodule Office.Space do
     case result do
       {:ok, screens, changed} ->
         changed = List.wrap(changed)
+        Office.BrowserControl.close_ended(state.screens, changed)
         Enum.each(changed, &broadcast(state, "screen_update", %{screen: &1}))
         reply = Enum.find(changed, &(&1.id == screen_id))
         {:reply, {:ok, reply}, %{state | screens: screens}}
@@ -384,6 +385,8 @@ defmodule Office.Space do
     case Enum.find(state.players, fn {_, p} -> p.ref == ref end) do
       {player_id, _} ->
         {screens, freed} = Screens.release_all(state.screens, player_id)
+        # The owner left the office: their shared-browser tabs end too.
+        Office.BrowserControl.close_ended(state.screens, freed)
 
         pongs =
           Map.new(state.pongs, fn {id, pong} ->

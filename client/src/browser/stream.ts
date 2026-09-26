@@ -10,6 +10,8 @@ export interface BrowserInfo {
   url: string
   title: string
   loading: boolean
+  /** The page itself is in fullscreen (e.g. a video's ⛶ button). */
+  fullscreen: boolean
   control: boolean
   status: 'connecting' | 'live' | 'waiting' | 'unavailable'
   error: string | null
@@ -76,7 +78,7 @@ class BrowserStream {
 
   private patch(p: Partial<BrowserInfo>) {
     useBrowsers.setState((s) => ({
-      [this.screenId]: { url: '', title: '', loading: false, control: false, status: 'connecting', error: null, ...s[this.screenId], ...p },
+      [this.screenId]: { url: '', title: '', loading: false, fullscreen: false, control: false, status: 'connecting', error: null, ...s[this.screenId], ...p },
     }))
   }
 
@@ -104,12 +106,12 @@ class BrowserStream {
     ws.onmessage = (e) => {
       if (typeof e.data === 'string') {
         try {
-          const msg = JSON.parse(e.data) as { t: string; url?: string; title?: string; loading?: boolean; message?: string; x?: number; y?: number }
+          const msg = JSON.parse(e.data) as { t: string; url?: string; title?: string; loading?: boolean; fullscreen?: boolean; message?: string; x?: number; y?: number }
           if (msg.t === 'cursor' && !useBrowsers.getState()[this.screenId]?.control) {
             this.cursor.x = msg.x ?? this.cursor.x
             this.cursor.y = msg.y ?? this.cursor.y
           }
-          if (msg.t === 'info') this.patch({ url: msg.url ?? '', title: msg.title ?? '', loading: !!msg.loading, status: 'live', error: null })
+          if (msg.t === 'info') this.patch({ url: msg.url ?? '', title: msg.title ?? '', loading: !!msg.loading, fullscreen: !!msg.fullscreen, status: 'live', error: null })
           if (msg.t === 'error') this.patch({ error: msg.message ?? 'Ошибка' })
         } catch {
           /* ignore */

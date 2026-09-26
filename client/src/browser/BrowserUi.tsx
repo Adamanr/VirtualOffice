@@ -6,6 +6,13 @@ import { openBrowser } from './actions'
 import { modifiers, toPage } from './input'
 import { browserStream, useBrowsers } from './stream'
 
+/** Real fullscreen for the 2D browser window (anyone watching). */
+function toggleFullscreen() {
+  const overlay = document.querySelector('.overlay') as HTMLElement | null
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+  else void overlay?.requestFullscreen?.().catch(() => {})
+}
+
 /** E-menu entry: open any site on this screen. */
 export function BrowserMenuItem({ screenId }: { screenId: string }) {
   const [url, setUrl] = useState('')
@@ -129,6 +136,14 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
     }
   }, [stream, control])
 
+  // The page went fullscreen (a video's ⛶): take the whole real screen too.
+  useEffect(() => {
+    if (!control) return
+    const overlay = host.current?.closest('.overlay') as HTMLElement | null
+    if (info?.fullscreen && !document.fullscreenElement) void overlay?.requestFullscreen?.().catch(() => {})
+    if (!info?.fullscreen && document.fullscreenElement === overlay) void document.exitFullscreen().catch(() => {})
+  }, [info?.fullscreen, control])
+
   // Esc closes the overlay unless the page has focus (then Esc belongs to the page).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -179,6 +194,9 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
           onChange={(e) => setAddress(e.target.value)}
           spellCheck={false}
         />
+        <button type="button" className="btn small" onClick={toggleFullscreen} title="На весь экран браузера">
+          ⛶
+        </button>
         <span className="muted small browser-who">{control ? 'Вы управляете · видят все рядом' : `Смотрите · управляет ${ownerName ?? '…'}`}</span>
       </form>
       <div ref={host} className="browser-view">

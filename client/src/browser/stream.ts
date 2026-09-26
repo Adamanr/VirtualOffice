@@ -200,6 +200,11 @@ export function browserStream(screenId: string): BrowserStream {
   return s
 }
 
+/** Takes the page out of its own fullscreen (e.g. a video left maximized). */
+export function collapsePage(screenId: string) {
+  browserStream(screenId).send({ t: 'exitFullscreen' })
+}
+
 /** The screen's browser ended or changed hands. */
 export function resetBrowserStream(screenId: string) {
   streams.get(screenId)?.restart()

@@ -3,6 +3,7 @@ import { getScreen, getSeat, screenLabel } from '../lib/level'
 import { closeOverlay, openOverlay, shareScreen, stopPresenting } from '../screens/actions'
 import { standUp } from '../screens/seats'
 import { enterFocus } from '../browser/focus'
+import { collapsePage, useBrowsers } from '../browser/stream'
 import { AnnotationOverlay } from '../annotate/AnnotateUi'
 import { useGame } from '../store/game'
 import { useMedia } from '../store/media'
@@ -86,6 +87,7 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
   const state = useScreens((s) => (screenId ? s.states[screenId] : undefined))
   const selfId = usePlayers((s) => s.selfId)
   const mediaOk = useMedia((s) => s.status === 'connected')
+  const pageFullscreen = useBrowsers((s) => (screenId ? !!s[screenId]?.fullscreen : false))
   if (!menuOpen || !target || target.kind === 'prop') return null
   const screen = screenId ? getScreen(screenId) : undefined
   const mine = state?.owner === selfId
@@ -107,6 +109,11 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
       {screen && state?.mode === 'browser' && mine && (
         <button className="btn primary" onClick={() => enterFocus(screen.id)}>
           🖱 Войти в экран (или клик по нему)
+        </button>
+      )}
+      {screen && state?.mode === 'browser' && mine && pageFullscreen && (
+        <button className="btn" onClick={() => collapsePage(screen.id)}>
+          🗗 Свернуть видео на экране
         </button>
       )}
       {screen && state && mine && (

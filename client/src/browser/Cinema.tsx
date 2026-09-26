@@ -5,8 +5,10 @@ import { browserStream, useBrowsers } from './stream'
 
 /**
  * The page went fullscreen (e.g. a video) while you drive it from the game:
- * your real browser goes fullscreen with the tab, input keeps flowing to the
- * page, and Esc leaves both fullscreens.
+ * your real browser goes fullscreen with the tab and input keeps flowing to
+ * the page. Esc only brings *you* back to the office — the video stays
+ * fullscreen on the screen for everyone (collapse it with the player's own
+ * control, or "🗗 Свернуть видео").
  */
 export function Cinema() {
   const focus = useScreens((s) => s.focus)
@@ -25,11 +27,6 @@ function CinemaView({ screenId }: { screenId: string }) {
     canvas.className = 'cinema-canvas'
     host.current?.appendChild(canvas)
     void document.documentElement.requestFullscreen?.().catch(() => {})
-    // Leaving our fullscreen (Esc) also takes the page out of its fullscreen.
-    const onChange = () => {
-      if (!document.fullscreenElement && useBrowsers.getState()[screenId]?.fullscreen) stream.send({ t: 'exitFullscreen' })
-    }
-    document.addEventListener('fullscreenchange', onChange)
     let raf = 0
     const loop = () => {
       const el = cursor.current
@@ -43,9 +40,7 @@ function CinemaView({ screenId }: { screenId: string }) {
     loop()
     return () => {
       cancelAnimationFrame(raf)
-      document.removeEventListener('fullscreenchange', onChange)
       canvas.remove()
-      if (useBrowsers.getState()[screenId]?.fullscreen) stream.send({ t: 'exitFullscreen' })
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
     }
   }, [stream, screenId])

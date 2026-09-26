@@ -4,7 +4,7 @@ import { usePlayers } from '../store/players'
 import { useScreens } from '../store/screens'
 import { openBrowser } from './actions'
 import { modifiers, toPage } from './input'
-import { browserStream, useBrowsers } from './stream'
+import { browserStream, collapsePage, useBrowsers } from './stream'
 
 /** Real fullscreen for the 2D browser window (anyone watching). */
 function toggleFullscreen() {
@@ -200,6 +200,11 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
         <button type="button" className="btn small" onClick={toggleFullscreen} title="На весь экран браузера">
           ⛶
         </button>
+        {control && info?.fullscreen && (
+          <button type="button" className="btn small" onClick={() => collapsePage(screenId)} title="Свернуть видео на странице">
+            🗗
+          </button>
+        )}
         <span className="muted small browser-who">{control ? 'Вы управляете · видят все рядом' : `Смотрите · управляет ${ownerName ?? '…'}`}</span>
       </form>
       <div ref={host} className="browser-view">

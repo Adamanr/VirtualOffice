@@ -12,6 +12,7 @@ function FocusHint() {
   return (
     <div className="focus-hint">
       🖱 Вы в экране{info?.title ? ` · ${info.title}` : ''} — мышь и клавиатура управляют страницей · <kbd>Esc</kbd> — обратно в офис
+      {info?.fullscreen ? ' (видео останется на весь экран)' : ''}
     </div>
   )
 }

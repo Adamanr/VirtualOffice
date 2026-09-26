@@ -1,59 +1,117 @@
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import * as THREE from 'three'
 import { Anim } from '@shared/protocol.gen'
+import type { Look } from '../lib/look'
 import { gestures, useActivity, type HeldItem } from '../store/activity'
-
-const bodyGeometry = new THREE.CapsuleGeometry(0.28, 0.6, 4, 12)
-const headGeometry = new THREE.IcosahedronGeometry(0.22, 2)
-const visorGeometry = new THREE.BoxGeometry(0.3, 0.09, 0.08)
-const headMaterial = new THREE.MeshLambertMaterial({ color: '#f1d3b8' })
-const visorMaterial = new THREE.MeshLambertMaterial({ color: '#1d2026' })
-const bodyMaterials = new Map<string, THREE.MeshLambertMaterial>()
-
-function bodyMaterial(color: string) {
-  let m = bodyMaterials.get(color)
-  if (!m) bodyMaterials.set(color, (m = new THREE.MeshLambertMaterial({ color })))
-  return m
-}
+import { acquireBody, avatarMaterial, hipX, releaseBody, shoulderX, SKELETON } from './humanoid'
 
 interface AvatarProps {
   /** Player id: drives gestures and held items shared by everyone. */
   id?: string | null
-  color: string
+  look: Look
   /** Current animation (Anim enum); read every frame, so pass a getter over mutable state. */
   getAnim: () => number
   children?: ReactNode
 }
 
-/** Stylized low-poly figure (3 draw calls) with procedural motion, gestures and a held item. */
-export function Avatar({ id, color, getAnim, children }: AvatarProps) {
+type Joint = RefObject<THREE.Group | null>
+
+/** Target joint angles for one frame (radians; x = swing forward/back, z = out to the side). */
+interface Pose {
+  legL: number
+  legR: number
+  kneeL: number
+  kneeR: number
+  armL: number
+  armR: number
+  armOutL: number
+  armOutR: number
+  elbowL: number
+  elbowR: number
+  spine: number
+  head: number
+  headTurn: number
+}
+
+const rest = (): Pose => ({ legL: 0, legR: 0, kneeL: 0, kneeR: 0, armL: 0, armR: 0, armOutL: 0.1, armOutR: 0.1, elbowL: -0.1, elbowR: -0.1, spine: 0, head: 0, headTurn: 0 })
+
+/** Is this player carrying something right now (a coffee, a snack…)? */
+const carrying = (id: string | null | undefined) => {
+  const held = id ? useActivity.getState().held[id] : undefined
+  return !!held && held.until > Date.now()
+}
+
+/**
+ * A low-poly office worker (see humanoid.ts) with procedural motion: walk and
+ * run cycles, sitting, idle breathing, one-shot gestures from activities, and
+ * a held item in the right hand.
+ */
+export function Avatar({ id, look, getAnim, children }: AvatarProps) {
   const figure = useRef<THREE.Group>(null)
-  // Random start phase so idle players don't bob in sync.
+  const spine = useRef<THREE.Group>(null)
+  const neck = useRef<THREE.Group>(null)
+  const legL = useRef<THREE.Group>(null)
+  const legR = useRef<THREE.Group>(null)
+  const kneeL = useRef<THREE.Group>(null)
+  const kneeR = useRef<THREE.Group>(null)
+  const armL = useRef<THREE.Group>(null)
+  const armR = useRef<THREE.Group>(null)
+  const elbowL = useRef<THREE.Group>(null)
+  const elbowR = useRef<THREE.Group>(null)
+  // Random start phase so idle players don't breathe in sync.
   const [initialPhase] = useState(() => Math.random() * 10)
   const phase = useRef(initialPhase)
-  const material = useMemo(() => bodyMaterial(color), [color])
+  const walkBlend = useRef(0)
 
-  useFrame((_, dt) => {
+  const { key, body } = useMemo(() => acquireBody(look), [look])
+  useEffect(() => () => releaseBody(key), [key])
+
+  useFrame((_, rawDt) => {
     const g = figure.current
     if (!g) return
+    const dt = Math.min(rawDt, 0.05)
     const anim = getAnim()
-    const speed = anim === Anim.run ? 15 : anim === Anim.walk ? 9 : 2
-    phase.current += dt * speed
+    const moving = anim === Anim.walk || anim === Anim.run
+    const run = anim === Anim.run
+    phase.current += dt * (run ? 11 : moving ? 7.5 : 1.6)
     const t = phase.current
+    walkBlend.current += ((moving ? 1 : 0) - walkBlend.current) * (1 - Math.exp(-dt * 10))
+    const w = walkBlend.current
+
+    const p = rest()
     let y = 0
     let tilt = 0
     let sway = 0
     let squash = 1
-    if (anim === Anim.walk || anim === Anim.run) {
-      y = Math.abs(Math.sin(t)) * (anim === Anim.run ? 0.1 : 0.06)
-      tilt = anim === Anim.run ? 0.18 : 0.07
-      sway = Math.sin(t) * 0.06
-    } else if (anim === Anim.sit) {
-      y = -0.3
-      tilt = -0.08
-    } else {
-      y = Math.sin(t) * 0.01
+    // Walk / run: legs swing, the knee bends on the way back, arms counter-swing.
+    const swing = Math.sin(t) * (run ? 0.75 : 0.5) * w
+    p.legL = swing
+    p.legR = -swing
+    p.kneeL = Math.max(0, Math.sin(t - 1.3)) * (run ? 1.3 : 0.75) * w
+    p.kneeR = Math.max(0, Math.sin(t + Math.PI - 1.3)) * (run ? 1.3 : 0.75) * w
+    p.armL = -swing * 0.8
+    p.armR = swing * 0.8
+    p.elbowL = p.elbowR = run ? -1.25 * w - 0.1 : -0.25 * w - 0.1
+    y = Math.abs(Math.cos(t)) * (run ? 0.07 : 0.035) * w - (run ? 0.04 : 0.015) * w
+    tilt = (run ? 0.16 : 0.04) * w
+    if (!moving) {
+      // Idle: breathing, a slow look around.
+      p.spine = Math.sin(t * 0.9) * 0.012
+      p.headTurn = Math.sin(t * 0.23) * 0.25 * (1 - w)
+    }
+    if (anim === Anim.sit) {
+      p.legL = p.legR = -Math.PI / 2 + 0.05
+      p.kneeL = p.kneeR = Math.PI / 2 - 0.05
+      p.armL = p.armR = -0.45
+      p.elbowL = p.elbowR = -0.7
+      p.armOutL = p.armOutR = 0.12
+      y = -SKELETON.hipY * look.height + 0.5
+      tilt = -0.04
+    }
+    if (carrying(id)) {
+      p.armR = -0.35
+      p.elbowR = -1.25
     }
 
     // One-shot gestures triggered by activities (seen by everyone).
@@ -65,44 +123,115 @@ export function Avatar({ id, color, getAnim, children }: AvatarProps) {
         const s = Math.sin(k * Math.PI)
         switch (gs.type) {
           case 'use':
-            tilt += 0.3 * s
+            p.armR = -1.3 * s
+            p.elbowR = -0.3
+            tilt += 0.12 * s
             break
           case 'kick':
-            tilt -= 0.35 * Math.sin(k * Math.PI * 2)
-            sway += 0.15 * s
+            p.legR = -1.2 * Math.sin(k * Math.PI)
+            p.kneeR = 0.3 * (1 - s)
+            p.armL = 0.4 * s
+            tilt -= 0.15 * s
             break
           case 'hop':
             y += 0.4 * Math.abs(Math.sin(k * Math.PI * 2))
-            sway += 0.2 * Math.sin(k * 20) * (1 - k)
+            p.armL = p.armR = -2.7 * s
+            p.armOutL = p.armOutR = 0.3 * s
+            p.kneeL = p.kneeR = 0.8 * Math.abs(Math.sin(k * Math.PI * 2))
             break
           case 'throw':
-            tilt += k < 0.4 ? -0.35 * (k / 0.4) : 0.4 * Math.sin(((k - 0.4) / 0.6) * Math.PI)
+            if (k < 0.4) {
+              p.armR = -2.8 * (k / 0.4)
+              p.elbowR = -1.5 * (k / 0.4)
+              tilt -= 0.12 * (k / 0.4)
+            } else {
+              const q = (k - 0.4) / 0.6
+              p.armR = -2.8 + 2.1 * Math.min(1, q * 1.6)
+              p.elbowR = -1.5 * (1 - q)
+              tilt += 0.25 * Math.sin(q * Math.PI)
+            }
             break
           case 'bonk':
-            sway += 0.35 * Math.sin(k * 30) * (1 - k)
-            squash = 1 - 0.18 * s
+            sway += 0.3 * Math.sin(k * 30) * (1 - k)
+            squash = 1 - 0.15 * s
+            p.head = 0.4 * s
+            p.armOutL = p.armOutR = 0.6 * s
             break
           case 'shiver':
-            sway += 0.08 * Math.sin(k * 60)
+            sway += 0.06 * Math.sin(k * 60)
+            p.armL = p.armR = -0.6
+            p.elbowL = p.elbowR = -1.9
+            p.armOutL = p.armOutR = -0.35
             break
         }
       }
     }
 
-    const kk = 1 - Math.exp(-dt * 12)
-    g.position.y += (y - g.position.y) * kk
-    g.rotation.x += (tilt - g.rotation.x) * kk
-    g.rotation.z += (sway - g.rotation.z) * (gs ? 0.6 : kk)
+    const kk = 1 - Math.exp(-dt * (gs ? 22 : 14))
+    const set = (j: Joint, x: number, z = 0) => {
+      const o = j.current
+      if (!o) return
+      o.rotation.x += (x - o.rotation.x) * kk
+      o.rotation.z += (z - o.rotation.z) * kk
+    }
+    set(legL, p.legL)
+    set(legR, p.legR)
+    set(kneeL, p.kneeL)
+    set(kneeR, p.kneeR)
+    set(armL, p.armL, -p.armOutL)
+    set(armR, p.armR, p.armOutR)
+    set(elbowL, p.elbowL)
+    set(elbowR, p.elbowR)
+    set(spine, p.spine)
+    if (neck.current) {
+      neck.current.rotation.x += (p.head - neck.current.rotation.x) * kk
+      neck.current.rotation.y += (p.headTurn - neck.current.rotation.y) * kk
+    }
+    const ks = 1 - Math.exp(-dt * 12)
+    g.position.y += (y - g.position.y) * (anim === Anim.sit ? 1 : ks)
+    g.rotation.x += (tilt - g.rotation.x) * ks
+    g.rotation.z += (sway - g.rotation.z) * (gs ? 0.6 : ks)
     g.scale.y += (squash - g.scale.y) * 0.5
   })
 
+  const { hipY, thigh, shoulderY, neckY, upperArm } = SKELETON
+  const m = avatarMaterial
   return (
     <group>
       <group ref={figure}>
-        <mesh geometry={bodyGeometry} material={material} position-y={0.72} />
-        <mesh geometry={headGeometry} material={headMaterial} position-y={1.52} />
-        <mesh geometry={visorGeometry} material={visorMaterial} position={[0, 1.55, 0.17]} />
-        {id && <Held id={id} />}
+        <group scale={look.height}>
+          <group ref={legL} position={[-hipX(look), hipY, 0]}>
+            <mesh geometry={body.thighL} material={m} />
+            <group ref={kneeL} position-y={-thigh}>
+              <mesh geometry={body.shinL} material={m} />
+            </group>
+          </group>
+          <group ref={legR} position={[hipX(look), hipY, 0]}>
+            <mesh geometry={body.thighR} material={m} />
+            <group ref={kneeR} position-y={-thigh}>
+              <mesh geometry={body.shinR} material={m} />
+            </group>
+          </group>
+          <group ref={spine} position-y={hipY}>
+            <mesh geometry={body.torso} material={m} />
+            <group ref={neck} position-y={neckY}>
+              <mesh geometry={body.head} material={m} />
+            </group>
+            <group ref={armL} position={[-shoulderX(look), shoulderY, 0]}>
+              <mesh geometry={body.upperArmL} material={m} />
+              <group ref={elbowL} position-y={-upperArm}>
+                <mesh geometry={body.forearmL} material={m} />
+              </group>
+            </group>
+            <group ref={armR} position={[shoulderX(look), shoulderY, 0]}>
+              <mesh geometry={body.upperArmR} material={m} />
+              <group ref={elbowR} position-y={-upperArm}>
+                <mesh geometry={body.forearmR} material={m} />
+                {id && <Held id={id} />}
+              </group>
+            </group>
+          </group>
+        </group>
       </group>
       {children}
     </group>
@@ -119,8 +248,9 @@ function Held({ id }: { id: string }) {
     return () => clearTimeout(t)
   }, [held])
   if (!held || held.until < Date.now()) return null
+  // In the right hand; turned back upright against the bent arm (see the carry pose).
   return (
-    <group position={[0.3, 1.0, 0.18]}>
+    <group position={[0, -0.3, 0.04]} rotation-x={1.6}>
       <HeldMesh item={held.item} color={held.color} />
     </group>
   )

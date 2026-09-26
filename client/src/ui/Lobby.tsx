@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useOffice } from '../lib/offices'
 import { navigate } from '../lib/route'
 import { media } from '../media/media'
 import { AVATAR_COLORS, useProfile } from '../store/profile'
 import { DeviceSelect, useDevices } from './DeviceSelect'
+
+// three.js + R3F: loaded only when the editor opens (the office preloads them anyway).
+const CharacterDialog = lazy(() => import('./CharacterEditor').then((m) => ({ default: m.CharacterDialog })))
 
 /** Live mic level (0..1) of a stream, for the lobby meter. */
 function useMicLevel(stream: MediaStream | null) {
@@ -37,6 +40,7 @@ function useMicLevel(stream: MediaStream | null) {
 export function Lobby({ spaceId, onEnter }: { spaceId: string; onEnter: () => void }) {
   const profile = useProfile()
   const office = useOffice(spaceId)
+  const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile.name)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [mediaError, setMediaError] = useState<string | null>(null)
@@ -131,7 +135,13 @@ export function Lobby({ spaceId, onEnter }: { spaceId: string; onEnter: () => vo
               <input className="input" autoFocus maxLength={32} value={name} onChange={(e) => setName(e.target.value)} placeholder="Как вас зовут?" />
             </label>
             <div className="field">
-              <span>Цвет аватара</span>
+              <span>Персонаж</span>
+              <button type="button" className="btn" onClick={() => setEditing(true)}>
+                🧍 Настроить внешность
+              </button>
+            </div>
+            <div className="field">
+              <span>Ваш цвет (подпись над головой, пометки)</span>
               <div className="swatches">
                 {AVATAR_COLORS.map((c) => (
                   <button
@@ -148,6 +158,11 @@ export function Lobby({ spaceId, onEnter }: { spaceId: string; onEnter: () => vo
           </div>
         </div>
 
+        {editing && (
+          <Suspense fallback={null}>
+            <CharacterDialog onClose={() => setEditing(false)} />
+          </Suspense>
+        )}
         {hasMedia ? (
           <>
             <div className="row wrap">

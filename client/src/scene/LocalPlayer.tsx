@@ -1,11 +1,13 @@
 import { useFrame } from '@react-three/fiber'
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from '@react-three/rapier'
 import type { KinematicCharacterController } from '@dimforge/rapier3d-compat'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { Anim } from '@shared/protocol.gen'
 import { isDown } from '../input/keyboard'
 import { getSeat, level } from '../lib/level'
+import { lookFor } from '../lib/look'
+import { useProfile } from '../store/profile'
 import { cameraState, local } from '../store/local'
 import { useGame } from '../store/game'
 import { usePlayers } from '../store/players'
@@ -28,7 +30,9 @@ function dampAngle(from: number, to: number, k: number) {
 }
 
 export function LocalPlayer({ color, children }: { color: string; children?: ReactNode }) {
+  const encodedLook = useProfile((s) => s.look)
   const selfId = usePlayers((s) => s.selfId)
+  const look = useMemo(() => lookFor(selfId ?? 'me', encodedLook, color), [selfId, encodedLook, color])
   const body = useRef<RapierRigidBody>(null)
   const visual = useRef<THREE.Group>(null)
   const controller = useRef<KinematicCharacterController | null>(null)
@@ -123,7 +127,7 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
         <CapsuleCollider args={[CAPSULE_HALF, CAPSULE_RADIUS]} />
       </RigidBody>
       <group ref={visual}>
-        <Avatar id={selfId} color={color} getAnim={() => local.anim}>
+        <Avatar id={selfId} look={look} getAnim={() => local.anim}>
           {children}
         </Avatar>
       </group>

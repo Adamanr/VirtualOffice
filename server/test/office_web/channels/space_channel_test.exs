@@ -375,4 +375,41 @@ defmodule OfficeWeb.SpaceChannelTest do
     push(owner, "screen_release", %{"screenId" => "hall_screen"})
     assert_broadcast "annot_settings", %{settings: %{screenId: "hall_screen", locked: false}}, 500
   end
+
+  test "the character look travels in presence and can be changed" do
+    look = "1|eec1a0|short|3b2619|none|none|tie|ffffff|2f4a73|pants|3a3f47|1c1714|100|100"
+
+    {:ok, _, socket} =
+      OfficeWeb.UserSocket
+      |> socket()
+      |> subscribe_and_join(OfficeWeb.SpaceChannel, "space:" <> space(), %{
+        "playerId" => "player-look",
+        "name" => "Dwight",
+        "color" => "#4f8cff",
+        "look" => look
+      })
+
+    assert_push "presence_state", %{"player-look" => %{metas: [%{look: ^look}]}}
+
+    push(socket, "set_look", %{"look" => "1|5e3b26|bald"})
+
+    assert_broadcast "presence_diff",
+                     %{joins: %{"player-look" => %{metas: [%{look: "1|5e3b26|bald"}]}}},
+                     500
+
+    ref = push(socket, "set_look", %{"look" => "<script>"})
+    assert_reply ref, :error, %{reason: "bad_payload"}
+  end
+
+  test "rejects a malformed look on join" do
+    assert {:error, %{reason: "bad_params"}} =
+             OfficeWeb.UserSocket
+             |> socket()
+             |> subscribe_and_join(OfficeWeb.SpaceChannel, "space:" <> space(), %{
+               "playerId" => "player-look2",
+               "name" => "Jim",
+               "color" => "#4f8cff",
+               "look" => String.duplicate("a", 200)
+             })
+  end
 end

@@ -26,12 +26,15 @@ defmodule OfficeWeb.SpaceChannel do
   intercept ["chat"]
 
   @space_id ~r/\A[A-Za-z0-9_-]{1,64}\z/
+  # Character look (client/src/lib/look.ts): "1|skin|hair|…"; clients decode it defensively.
+  @look ~r/\A[0-9a-z|]{0,160}\z/
 
   @impl true
   def join("space:" <> space_id, params, socket) do
     with true <- space_id =~ @space_id || {:error, :bad_params},
          {:ok, params} <- Protocol.validate_join(params),
          true <- params["color"] =~ ~r/\A#[0-9a-fA-F]{6}\z/ || {:error, :bad_params},
+         true <- (params["look"] || "") =~ @look || {:error, :bad_params},
          {:ok, identity} <- Auth.authorize(params),
          {:ok, snapshot} <-
            Space.join(space_id, identity.player_id, identity.name, params["color"], self()) do
@@ -43,6 +46,7 @@ defmodule OfficeWeb.SpaceChannel do
           player_id: identity.player_id,
           name: identity.name,
           color: params["color"],
+          look: params["look"] || "",
           zone: nil,
           last: nil,
           muted: true,
@@ -112,6 +116,16 @@ defmodule OfficeWeb.SpaceChannel do
     socket = assign(socket, muted: muted, cam: cam)
     Presence.update(socket, socket.assigns.player_id, meta(socket))
     {:noreply, socket}
+  end
+
+  defp handle_event("set_look", %{"look" => look}, socket) do
+    if look =~ @look do
+      socket = assign(socket, look: look)
+      Presence.update(socket, socket.assigns.player_id, meta(socket))
+      {:noreply, socket}
+    else
+      {:reply, error(:bad_payload), socket}
+    end
   end
 
   defp handle_event("livekit_token", _payload, socket) do
@@ -507,6 +521,7 @@ defmodule OfficeWeb.SpaceChannel do
       zone: socket.assigns.zone,
       muted: socket.assigns.muted,
       cam: socket.assigns.cam,
+      look: socket.assigns.look,
       online_at: System.system_time(:second)
     }
   end

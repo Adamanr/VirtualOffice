@@ -18,6 +18,7 @@ export interface PresenceMeta {
   zone: string | null;
   muted: boolean;
   cam: boolean;
+  look: string;
   online_at: number;
 }
 
@@ -179,6 +180,7 @@ export interface JoinParams {
   playerId: string;
   name: string;
   color: string;
+  look?: string;
   auth?: string;
 }
 
@@ -209,6 +211,10 @@ export interface MovePayload {
 export interface MediaStatePayload {
   muted: boolean;
   cam: boolean;
+}
+
+export interface SetLookPayload {
+  look: string;
 }
 
 export interface LivekitTokenPayload {}
@@ -371,6 +377,7 @@ export interface AnnotSettingsPayload {
 export interface ClientEvents {
   move: { payload: MovePayload; reply: null };
   media_state: { payload: MediaStatePayload; reply: null };
+  set_look: { payload: SetLookPayload; reply: null };
   livekit_token: { payload: LivekitTokenPayload; reply: LivekitTokenReply };
   screen_claim: { payload: ScreenClaimPayload; reply: ScreenClaimReply };
   screen_release: { payload: ScreenReleasePayload; reply: null };
@@ -523,5 +530,5 @@ export interface ServerEvents {
 
 export type ProtocolError = 'bad_payload' | 'unknown_event' | 'rate_limited' | 'busy' | 'not_owner' | 'too_far' | 'unknown_screen' | 'unknown_prop' | 'livekit_disabled' | 'cooldown' | 'locked';
 
-export const CLIENT_EVENTS = ["move","media_state","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","prop_use","toss","alarm_pull","prank","browser_token","pong_join","pong_leave","pong_paddle","dart_throw","darts_clear","note","annot_stroke","annot_undo","annot_clear","annot_laser","annot_settings"] as const;
+export const CLIENT_EVENTS = ["move","media_state","set_look","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","prop_use","toss","alarm_pull","prank","browser_token","pong_join","pong_leave","pong_paddle","dart_throw","darts_clear","note","annot_stroke","annot_undo","annot_clear","annot_laser","annot_settings"] as const;
 export const SERVER_EVENTS = ["batch","correction","screen_update","chat","reaction","board_stroke","board_clear","sticker_update","prop_event","toss","scores","drill","desk_update","pong_state","dart","darts_clear","note","annot_stroke","annot_remove","annot_laser","annot_settings"] as const;

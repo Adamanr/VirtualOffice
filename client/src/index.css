@@ -256,3 +256,25 @@ kbd { font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12); bo
 .focus-tabs .active { color: #ffd84a; font-weight: 600; }
 .focus-keys { font-size: 11px; opacity: 0.7; margin-top: 2px; text-align: center; }
 .focus-hint { white-space: normal; text-align: center; max-width: calc(100% - 24px); }
+
+/* Character editor */
+.char-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(5,7,10,0.72); display: grid; place-items: center; padding: 16px; overflow: auto; }
+.card.char-dialog { width: min(820px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.char-layout { display: grid; grid-template-columns: 280px 1fr; gap: 18px; min-height: 0; }
+@media (max-width: 700px) { .char-layout { grid-template-columns: 1fr; } }
+.char-left { display: flex; flex-direction: column; gap: 8px; }
+.char-preview { width: 100% !important; height: 360px !important; border-radius: 12px; background: radial-gradient(circle at 50% 40%, #2c3a55 0%, #121722 75%); cursor: grab; touch-action: none; }
+.char-preview:active { cursor: grabbing; }
+.char-preview-tools { justify-content: center; }
+.char-right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 8px 12px; cursor: pointer; font: inherit; font-size: 14px; }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer; }
+.chip:hover { background: rgba(255,255,255,0.12); }
+.chip.active { background: var(--accent); border-color: transparent; color: white; }
+.swatches.small .swatch { width: 26px; height: 26px; }
+.swatch.custom { position: relative; background: conic-gradient(#e5484d, #f5a524, #30a46c, #12a594, #4f8cff, #8e4ec6, #e93d82, #e5484d); overflow: hidden; }
+.swatch.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.field input[type=range] { width: 100%; accent-color: var(--accent); }

@@ -1,10 +1,13 @@
 import { create } from 'zustand'
+import { encodeLook, randomLook } from '../lib/look'
 
 export const AVATAR_COLORS = ['#4f8cff', '#e5484d', '#30a46c', '#f5a524', '#8e4ec6', '#12a594', '#e93d82', '#6e56cf'] as const
 
 export interface Profile {
   name: string
   color: string
+  /** Character look, encoded (lib/look.ts). */
+  look: string
   micId: string | null
   camId: string | null
   speakerId: string | null
@@ -17,9 +20,11 @@ export interface Profile {
 const KEY = 'vo.profile'
 
 function load(): Profile {
+  const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]!
   const fallback: Profile = {
     name: '',
-    color: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]!,
+    color,
+    look: encodeLook(randomLook(undefined, color)),
     micId: null,
     camId: null,
     speakerId: null,

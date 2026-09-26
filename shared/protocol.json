@@ -26,6 +26,7 @@
       "zone": "string | null",
       "muted": "boolean",
       "cam": "boolean",
+      "look": "string",
       "online_at": "number"
     },
     "PdfState": {
@@ -171,6 +172,7 @@
       "playerId": "string",
       "name": "string",
       "color": "string",
+      "look?": "string",
       "auth?": "string"
     },
     "reply": {
@@ -207,6 +209,12 @@
       "payload": {
         "muted": "boolean",
         "cam": "boolean"
+      },
+      "reply": null
+    },
+    "set_look": {
+      "payload": {
+        "look": "string"
       },
       "reply": null
     },

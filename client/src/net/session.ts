@@ -47,12 +47,16 @@ export function onSession(l: Listener): () => void {
   return () => listeners.delete(l)
 }
 
+/** Join params of the current session; phoenix.js rejoins with this same object. */
+let joinParams: JoinParams | null = null
+
 export function startSession(spaceId: string, profile: Omit<JoinParams, 'playerId'>) {
   stopSession()
   usePlayers.setState({ selfId: playerId, status: 'connecting', joinError: null, players: {}, reactions: {} })
+  joinParams = { playerId, ...profile }
   const c = new SpaceConnection(
     spaceId,
-    { playerId, ...profile },
+    joinParams,
     {
       onStatus: (status) => usePlayers.setState({ status }),
       onJoinError: (joinError) => usePlayers.setState({ joinError }),
@@ -100,4 +104,10 @@ export function stopSession() {
 
 if (import.meta.env.DEV) {
   ;(window as unknown as { __conn: () => SpaceConnection | null }).__conn = () => conn
+}
+
+/** Changes your character for everyone (and for rejoins after a dropped connection). */
+export function sendLook(look: string) {
+  if (joinParams) joinParams.look = look
+  conn?.send('set_look', { look })
 }

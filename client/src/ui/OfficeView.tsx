@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { CharacterDialog } from './CharacterEditor'
+import { useEffect, useState } from 'react'
 import { setKeyboardActive } from '../input/keyboard'
 import { startSession, stopSession } from '../net/session'
 import { NetSync } from '../scene/NetSync'
@@ -55,7 +56,8 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
   const inScreen = useScreens((s) => !!s.focus)
 
   useEffect(() => {
-    startSession(spaceId, { name, color })
+    // The look is read once here; later changes go out as set_look (no reconnect).
+    startSession(spaceId, { name, color, look: useProfile.getState().look })
     setKeyboardActive(true)
     return () => {
       setKeyboardActive(false)
@@ -120,11 +122,24 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       <MediaControls>
         <ReactionButtons />
         <ChatButton />
+        <CharacterButton />
         <button className="ctl danger" onClick={() => navigate('/')} title="Выйти">
           <LeaveIcon />
         </button>
       </MediaControls>
       <HelpHint />
     </div>
+  )
+}
+
+function CharacterButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button className="ctl" onClick={() => setOpen(true)} title="Персонаж: внешность">
+        🧍
+      </button>
+      {open && <CharacterDialog onClose={() => setOpen(false)} />}
+    </>
   )
 }

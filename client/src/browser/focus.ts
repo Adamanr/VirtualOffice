@@ -1,4 +1,4 @@
-import { setKeyboardActive } from '../input/keyboard'
+import { blockKeyboard } from '../input/keyboard'
 import { useScreens } from '../store/screens'
 import { usePlayers } from '../store/players'
 import { notify, useGame } from '../store/game'
@@ -57,7 +57,7 @@ function install(screenId: string, canvas: HTMLCanvasElement, onError: () => voi
   cleanup?.()
   const stream = browserStream(screenId)
   stream.acquire()
-  setKeyboardActive(false)
+  const unblock = blockKeyboard()
   let lastMove = 0
   // Page pixels per screen pixel: the framed screen fills ~90% of the window width.
   const speed = () => VIEWPORT.width / (window.innerWidth * 0.9)
@@ -141,7 +141,7 @@ function install(screenId: string, canvas: HTMLCanvasElement, onError: () => voi
     document.removeEventListener('pointerlockchange', lockChange)
     document.removeEventListener('contextmenu', menu)
     document.removeEventListener('pointerlockerror', onError)
-    setKeyboardActive(true)
+    unblock()
     stream.release()
   }
 }

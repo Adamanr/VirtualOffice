@@ -3,8 +3,10 @@
  * layout (e.g. Russian ЙЦУКЕН). Ignores keys while typing in inputs.
  */
 const pressed = new Set<string>()
-/** Game keys are only live while the office view is mounted. */
-let active = false
+/** Game keys are only live while the office view is mounted… */
+let enabled = false
+/** …and nothing else has taken the keyboard (a browser screen, the piano…). */
+const blocks = new Set<symbol>()
 type Handler = (e: KeyboardEvent) => void
 const handlers = new Map<string, Set<Handler>>()
 const upHandlers = new Map<string, Set<Handler>>()
@@ -14,28 +16,58 @@ export function isTyping(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
+const live = () => enabled && blocks.size === 0
+
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
-    if (!active || isTyping(e.target)) return
+    if (!live() || isTyping(e.target)) return
     if (e.code === 'Tab') e.preventDefault()
     const first = !pressed.has(e.code)
     pressed.add(e.code)
     if (first && !e.repeat) handlers.get(e.code)?.forEach((h) => h(e))
   })
-  window.addEventListener('keyup', (e) => {
-    if (pressed.delete(e.code)) upHandlers.get(e.code)?.forEach((h) => h(e))
-  })
-  window.addEventListener('blur', () => {
-    for (const code of pressed) upHandlers.get(code)?.forEach((h) => h(new KeyboardEvent('keyup', { code })))
-    pressed.clear()
-  })
+  // Capture phase on window runs before anything else: the shared browser swallows
+  // key events (stopPropagation) while you drive a screen, and a missed release
+  // would leave the character walking on its own.
+  window.addEventListener(
+    'keyup',
+    (e) => {
+      if (pressed.delete(e.code)) upHandlers.get(e.code)?.forEach((h) => h(e))
+    },
+    true,
+  )
+  window.addEventListener('blur', releaseAllKeys)
+  document.addEventListener('visibilitychange', () => document.hidden && releaseAllKeys())
+}
+
+/** Treats every held key as released (focus moves to a screen, the window loses focus…). */
+export function releaseAllKeys() {
+  for (const code of [...pressed]) {
+    pressed.delete(code)
+    upHandlers.get(code)?.forEach((h) => h(new KeyboardEvent('keyup', { code })))
+  }
 }
 
 export const isDown = (code: string) => pressed.has(code)
 
+/** The office view is (un)mounted. */
 export function setKeyboardActive(value: boolean) {
-  active = value
-  pressed.clear()
+  enabled = value
+  releaseAllKeys()
+}
+
+/**
+ * Takes the keyboard away from the game until the returned function is called.
+ * Blocks nest: overlapping ones (the browser window closing as you enter the
+ * screen) can't hand the keys back to the game early.
+ */
+export function blockKeyboard(): () => void {
+  const token = Symbol('block')
+  blocks.add(token)
+  releaseAllKeys()
+  return () => {
+    blocks.delete(token)
+  }
 }
 
 /** Subscribes to a key press (no auto-repeat), or release with `'up'`. Returns an unsubscribe function. */

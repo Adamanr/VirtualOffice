@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { Dart, PongState } from '@shared/protocol.gen'
-import { setKeyboardActive } from '../input/keyboard'
+import { blockKeyboard } from '../input/keyboard'
 import { burst } from '../fx/particles'
 import { play } from '../fx/sfx'
 import { getProp } from '../lib/level'
@@ -115,10 +115,14 @@ export const DART_FLIGHT_MS = FLIGHT_MS
 
 // --- piano -----------------------------------------------------------------------------------
 
+/** The piano plays from the keyboard: WASD mustn't walk you away from it. */
+let unblockPiano: (() => void) | null = null
+
 export function sitAtPiano(propId: string) {
   syncPosition()
   placeAt(propId, 'piano')
-  setKeyboardActive(false)
+  unblockPiano?.()
+  unblockPiano = blockKeyboard()
 }
 
 export function sendNote(propId: string, midi: number) {
@@ -138,5 +142,6 @@ export function leaveActivity() {
   if (!mode) return
   useActivity.setState({ mode: null })
   if (mode.kind === 'pong') getConnection()?.send('pong_leave', { tableId: mode.propId })
-  if (mode.kind === 'piano') setKeyboardActive(true)
+  unblockPiano?.()
+  unblockPiano = null
 }

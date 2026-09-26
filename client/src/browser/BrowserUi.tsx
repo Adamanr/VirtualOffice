@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { setKeyboardActive } from '../input/keyboard'
+import { blockKeyboard } from '../input/keyboard'
 import { usePlayers } from '../store/players'
 import { useScreens } from '../store/screens'
 import { openBrowser } from './actions'
@@ -51,10 +51,7 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
   const control = !!info?.control
 
   // The page gets the keyboard, not the game.
-  useEffect(() => {
-    setKeyboardActive(false)
-    return () => setKeyboardActive(true)
-  }, [])
+  useEffect(() => blockKeyboard(), [])
 
   useEffect(() => {
     stream.acquire()

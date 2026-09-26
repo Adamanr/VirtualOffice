@@ -27,7 +27,8 @@ function WhiteboardSurface({ prop }: { prop: Prop }) {
   const [w, h] = prop.size
   const nx = Math.sin(prop.rotY) * 0.035
   const nz = Math.cos(prop.rotY) * 0.035
-  const material = useMemo(() => new THREE.MeshBasicMaterial({ toneMapped: false, transparent: true }), [])
+  // Opaque: the board's own white face must not show through the drawing.
+  const material = useMemo(() => new THREE.MeshLambertMaterial({ color: '#ffffff' }), [])
   useEffect(() => {
     material.map = texture
     material.needsUpdate = true
@@ -40,7 +41,7 @@ function WhiteboardSurface({ prop }: { prop: Prop }) {
       material={material}
       position={[prop.x + nx, prop.elevation, prop.z + nz]}
       rotation-y={prop.rotY}
-      scale={[w * 0.98, h * 0.98, 1]}
+      scale={[w, h, 1]}
     />
   )
 }
@@ -65,7 +66,8 @@ function useBoardTexture(prop: Prop, strokes: BoardStroke[]) {
     const t = tex
     if (!c || !t) return
     const g = c.getContext('2d')!
-    g.clearRect(0, 0, c.width, c.height)
+    g.fillStyle = '#f7f6f1'
+    g.fillRect(0, 0, c.width, c.height)
     for (const s of strokes) {
       if (s.points.length < 4) continue
       g.strokeStyle = s.color

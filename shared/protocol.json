@@ -37,8 +37,9 @@
     "ScreenState": {
       "id": "string",
       "owner": "string | null",
-      "mode": "'share' | 'pdf' | null",
-      "pdf": "PdfState | null"
+      "mode": "'share' | 'pdf' | 'browser' | null",
+      "pdf": "PdfState | null",
+      "url": "string | null"
     },
     "ChatMessage": {
       "id": "string",
@@ -178,7 +179,8 @@
     "screen_claim": {
       "payload": {
         "screenId": "string",
-        "mode": "'share' | 'pdf'"
+        "mode": "'share' | 'pdf' | 'browser'",
+        "url?": "string"
       },
       "reply": {
         "screen": "ScreenState"
@@ -279,6 +281,15 @@
         "deskId": "string"
       },
       "reply": null
+    },
+    "browser_token": {
+      "payload": {
+        "screenId": "string"
+      },
+      "reply": {
+        "token": "string",
+        "control": "boolean"
+      }
     }
   },
   "server": {

@@ -104,7 +104,7 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
       )}
       {screen && state && mine && (
         <>
-          {state.mode === 'share' && extra?.(screen.id)}
+          {state.mode !== 'pdf' && extra?.(screen.id)}
           <button className="btn danger" onClick={() => stopPresenting(screen.id)}>
             ⏹ Перестать показывать
           </button>
@@ -112,7 +112,7 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
       )}
       {screen && state && (
         <button className="btn" onClick={() => openOverlay(screen.id)}>
-          🔍 Смотреть крупно (F)
+          {state.mode === 'browser' ? (mine ? '🌐 Открыть браузер (F)' : '🌐 Смотреть браузер (F)') : '🔍 Смотреть крупно (F)'}
         </button>
       )}
       {seat && (
@@ -143,7 +143,13 @@ function OverlayVideo({ screenId }: { screenId: string }) {
 }
 
 /** Full-window 2D view of a screen: in 3D the text is too small to read. */
-export function ScreenOverlay({ renderPdf }: { renderPdf?: (screenId: string) => React.ReactNode }) {
+export function ScreenOverlay({
+  renderPdf,
+  renderBrowser,
+}: {
+  renderPdf?: (screenId: string) => React.ReactNode
+  renderBrowser?: (screenId: string) => React.ReactNode
+}) {
   const overlay = useScreens((s) => s.overlay)
   const state = useScreens((s) => (overlay ? s.states[overlay] : undefined))
   const owner = usePlayers((s) => (state?.owner ? s.players[state.owner] : undefined))
@@ -172,7 +178,13 @@ export function ScreenOverlay({ renderPdf }: { renderPdf?: (screenId: string) =>
         </button>
       </div>
       <div className="overlay-body" onClick={(e) => e.stopPropagation()}>
-        {state.mode === 'share' ? <OverlayVideo screenId={overlay} /> : renderPdf?.(overlay)}
+        {state.mode === 'share' ? (
+          <OverlayVideo screenId={overlay} />
+        ) : state.mode === 'browser' ? (
+          renderBrowser?.(overlay)
+        ) : (
+          renderPdf?.(overlay)
+        )}
       </div>
     </div>
   )

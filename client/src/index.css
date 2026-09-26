@@ -182,3 +182,15 @@ kbd { font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12); bo
 .charge-track { width: 100%; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.12); overflow: hidden; }
 .charge-bar { height: 100%; background: linear-gradient(90deg, #30a46c, #f5a524, #e5484d); }
 .prank-hint { position: absolute; left: 50%; bottom: 160px; transform: translateX(-50%); padding: 6px 12px; font-size: 13px; z-index: 19; white-space: nowrap; }
+
+/* Shared browser */
+.browser { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 8px; }
+.browser-bar { display: flex; gap: 6px; align-items: center; }
+.browser-address { flex: 1; font-family: ui-monospace, monospace; font-size: 13px; }
+.browser-who { white-space: nowrap; }
+.browser-view { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
+.browser-canvas { max-width: 100%; max-height: 100%; aspect-ratio: 16 / 10; width: auto; height: 100%; background: #fff; border-radius: 6px; outline: none; cursor: default; }
+.browser-canvas:focus { box-shadow: 0 0 0 2px var(--accent); }
+.browser-status { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--panel-solid); border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; font-size: 13px; }
+.browser-open { width: 100%; }
+.browser-open .input { flex: 1; }

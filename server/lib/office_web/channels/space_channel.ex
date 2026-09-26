@@ -7,7 +7,20 @@ defmodule OfficeWeb.SpaceChannel do
 
   use Phoenix.Channel, log_handle_in: false
 
-  alias Office.{Auth, Chat, Level, LiveKit, Movement, Protocol, RateLimit, Screens, Space, Toss}
+  alias Office.{
+    Auth,
+    BrowserToken,
+    Chat,
+    Level,
+    LiveKit,
+    Movement,
+    Protocol,
+    RateLimit,
+    Screens,
+    Space,
+    Toss
+  }
+
   alias OfficeWeb.Presence
 
   intercept ["chat"]
@@ -112,25 +125,44 @@ defmodule OfficeWeb.SpaceChannel do
     end
   end
 
-  defp handle_event("screen_claim", %{"screenId" => screen_id, "mode" => mode}, socket) do
+  defp handle_event("screen_claim", %{"screenId" => screen_id, "mode" => mode} = payload, socket) do
+    url = payload["url"]
+
     case Level.screen(Level.get(), screen_id) do
       nil ->
         {:reply, error(:unknown_screen), socket}
 
+      _ when mode == "browser" and not is_binary(url) ->
+        {:reply, error(:bad_payload), socket}
+
       screen ->
-        if Screens.can_use?(screen, socket.assigns.zone, position(socket)) do
-          case Space.claim_screen(
-                 socket.assigns.space_id,
-                 socket.assigns.player_id,
-                 screen_id,
-                 mode
-               ) do
-            {:ok, screen} -> {:reply, {:ok, %{screen: screen}}, socket}
-            {:error, reason} -> {:reply, error(reason), socket}
-          end
-        else
-          {:reply, error(:too_far), socket}
+        cond do
+          mode == "browser" and not BrowserToken.valid_url?(url) ->
+            {:reply, error(:bad_payload), socket}
+
+          not Screens.can_use?(screen, socket.assigns.zone, position(socket)) ->
+            {:reply, error(:too_far), socket}
+
+          true ->
+            claim_screen(socket, screen_id, mode, url)
         end
+    end
+  end
+
+  # Watching the shared browser on a screen you can see; only its owner drives it.
+  defp handle_event("browser_token", %{"screenId" => screen_id}, socket) do
+    %{space_id: space_id, player_id: me, zone: zone} = socket.assigns
+
+    with %{} = screen <- Level.screen(Level.get(), screen_id),
+         %{mode: "browser", owner: owner, url: url} when is_binary(owner) <-
+           Space.screen_state(space_id, screen_id),
+         true <- owner == me or Screens.can_see?(screen, zone, position(socket)) do
+      control = owner == me
+      token = BrowserToken.issue(screen_id, me, control, owner <> "|" <> url, url)
+      {:reply, {:ok, %{token: token, control: control}}, socket}
+    else
+      false -> {:reply, error(:too_far), socket}
+      _ -> {:reply, error(:unknown_screen), socket}
     end
   end
 
@@ -300,6 +332,15 @@ defmodule OfficeWeb.SpaceChannel do
   end
 
   # --- helpers
+
+  defp claim_screen(socket, screen_id, mode, url) do
+    %{space_id: space_id, player_id: me} = socket.assigns
+
+    case Space.claim_screen(space_id, me, screen_id, mode, url) do
+      {:ok, screen} -> {:reply, {:ok, %{screen: screen}}, socket}
+      {:error, reason} -> {:reply, error(reason), socket}
+    end
+  end
 
   defp limit("move", socket) do
     case RateLimit.take(socket.assigns.move_bucket, now_ms()) do

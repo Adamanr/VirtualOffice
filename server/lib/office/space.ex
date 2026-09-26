@@ -28,8 +28,10 @@ defmodule Office.Space do
   def move(space_id, player_id, state),
     do: GenServer.cast(via(space_id), {:move, player_id, state})
 
-  def claim_screen(space_id, player_id, screen_id, mode),
-    do: call(space_id, {:screen, :claim, player_id, screen_id, mode})
+  def claim_screen(space_id, player_id, screen_id, mode, url \\ nil),
+    do: call(space_id, {:screen, :claim, player_id, screen_id, {mode, url}})
+
+  def screen_state(space_id, screen_id), do: call(space_id, {:screen_state, screen_id})
 
   def release_screen(space_id, player_id, screen_id),
     do: call(space_id, {:screen, :release, player_id, screen_id, nil})
@@ -138,7 +140,7 @@ defmodule Office.Space do
   def handle_call({:screen, op, player_id, screen_id, arg}, _from, state) do
     result =
       case op do
-        :claim -> Screens.claim(state.screens, screen_id, player_id, arg)
+        :claim -> Screens.claim(state.screens, screen_id, player_id, elem(arg, 0), elem(arg, 1))
         :release -> Screens.release(state.screens, screen_id, player_id)
         :open_pdf -> Screens.open_pdf(state.screens, screen_id, player_id, arg)
         :set_page -> Screens.set_page(state.screens, screen_id, player_id, arg)
@@ -155,6 +157,9 @@ defmodule Office.Space do
         {:reply, {:error, reason}, state}
     end
   end
+
+  def handle_call({:screen_state, screen_id}, _from, state),
+    do: {:reply, Map.get(state.screens, screen_id), state}
 
   def handle_call({:chat, msg}, _from, state) do
     broadcast(state, "chat", %{msg: msg})

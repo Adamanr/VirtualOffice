@@ -26,6 +26,12 @@ config :office, OfficeWeb.Endpoint,
 if path = System.get_env("LEVEL_PATH"), do: config(:office, :level_path, path)
 if dir = System.get_env("UPLOADS_DIR"), do: config(:office, :uploads_dir, dir)
 
+cond do
+  secret = System.get_env("BROWSER_SECRET") -> config(:office, :browser_secret, secret)
+  config_env() == :prod -> raise "environment variable BROWSER_SECRET is missing"
+  true -> :ok
+end
+
 # LiveKit: API key/secret are used to sign access tokens (Joken, HS256).
 # LIVEKIT_PUBLIC_URL is what browsers connect to; empty means "same origin + /lk"
 # (Caddy / Vite proxy the /lk prefix to livekit-server).

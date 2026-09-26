@@ -4,6 +4,7 @@ import { getConnection, onSession } from '../net/session'
 import { notify, useGame } from '../store/game'
 import { usePlayers } from '../store/players'
 import { setScreenState, useScreens } from '../store/screens'
+import { resetBrowserStream } from '../browser/stream'
 
 const REASONS: Record<string, string> = {
   busy: 'Этот экран уже занят другим докладчиком',
@@ -49,6 +50,11 @@ export function closeOverlay() {
 // Screen state from the server: initial snapshot on (re)join, then updates.
 onSession((conn) => {
   conn.on('screen_update', ({ screen }) => {
+    const prev = useScreens.getState().states[screen.id]
+    // The browser tab on this screen ended or changed hands: reconnect from scratch.
+    if (prev?.mode === 'browser' && (screen.mode !== 'browser' || screen.owner !== prev.owner || screen.url !== prev.url)) {
+      resetBrowserStream(screen.id)
+    }
     setScreenState(screen)
     const self = usePlayers.getState().selfId
     // Lost the screen (e.g. claimed another one): stop publishing to it.

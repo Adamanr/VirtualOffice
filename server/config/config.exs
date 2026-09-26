@@ -12,6 +12,8 @@ config :office,
   level_path: Path.expand("../../shared/level.json", __DIR__),
   uploads_dir: Path.join(System.tmp_dir!(), "office_uploads"),
   max_players_per_space: 30,
+  # Shared browser service (browser/): HMAC secret for its access tokens.
+  browser_secret: "dev-browser-secret",
   # Mode of guest auth; OAuth (Google) plugs in via Office.Auth later.
   auth_mode: :guest
 

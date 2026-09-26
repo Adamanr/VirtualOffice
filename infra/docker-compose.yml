@@ -30,10 +30,26 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
       LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-}
+      BROWSER_SECRET: ${BROWSER_SECRET}
       LEVEL_PATH: /app/shared/level.json
       UPLOADS_DIR: /data/uploads
     volumes:
       - uploads:/data/uploads
+    restart: unless-stopped
+
+  # Headless Chromium for "open any site" on office computers. Its traffic goes
+  # through a built-in filtering proxy: public internet only (no SSRF to LAN,
+  # localhost or cloud metadata).
+  browser:
+    build:
+      context: ../browser
+    network_mode: host
+    environment:
+      NODE_ENV: production
+      PORT: 4100
+      BROWSER_SECRET: ${BROWSER_SECRET}
+      MAX_SESSIONS: ${BROWSER_MAX_SESSIONS:-6}
+    shm_size: 1gb
     restart: unless-stopped
 
   caddy:
@@ -48,7 +64,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [phoenix, livekit]
+    depends_on: [phoenix, livekit, browser]
     restart: unless-stopped
 
 volumes:

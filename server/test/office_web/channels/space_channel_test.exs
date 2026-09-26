@@ -220,4 +220,44 @@ defmodule OfficeWeb.SpaceChannelTest do
     assert_broadcast "desk_update", %{deskId: ^desk_id, jello: false}, 500
     {%{jellos: []}, _} = join_as(s, "player-cccc")
   end
+
+  test "shared browser on a desk monitor: owner drives, neighbours watch, far away is refused" do
+    s = space()
+    {_, a} = join_as(s, "player-aaaa")
+    {_, b} = join_as(s, "player-bbbb")
+    {_, c} = join_as(s, "player-cccc")
+    screen = Office.Level.screen(Office.Level.get(), "desk_01_monitor")
+    {sx, _, sz} = screen.position
+    push(a, "move", %{"s" => [sx, 0, sz - 1.0, 0, 0]})
+    push(b, "move", %{"s" => [sx + 2, 0, sz - 1.0, 0, 0]})
+    push(c, "move", %{"s" => [2, 0, 12, 0, 0]})
+    Process.sleep(30)
+
+    ref =
+      push(a, "screen_claim", %{
+        "screenId" => "desk_01_monitor",
+        "mode" => "browser",
+        "url" => "file:///etc/passwd"
+      })
+
+    assert_reply ref, :error, %{reason: "bad_payload"}
+
+    ref =
+      push(a, "screen_claim", %{
+        "screenId" => "desk_01_monitor",
+        "mode" => "browser",
+        "url" => "https://example.com/"
+      })
+
+    assert_reply ref, :ok, %{
+      screen: %{mode: "browser", url: "https://example.com/", owner: "player-aaaa"}
+    }
+
+    ref = push(a, "browser_token", %{"screenId" => "desk_01_monitor"})
+    assert_reply ref, :ok, %{control: true, token: _}
+    ref = push(b, "browser_token", %{"screenId" => "desk_01_monitor"})
+    assert_reply ref, :ok, %{control: false}
+    ref = push(c, "browser_token", %{"screenId" => "desk_01_monitor"})
+    assert_reply ref, :error, %{reason: "too_far"}
+  end
 end

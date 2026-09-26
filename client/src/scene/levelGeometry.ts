@@ -333,10 +333,7 @@ export function buildLevelGeometry(level: Level): LevelGeometry {
         part('metal', x, z, r, [0, y - d / 2 - 0.02, 0.05], [w * 0.5, 0.025, 0.07])
         const inks = ['#1d4ed8', '#c8322f', '#1d2026', '#15803d']
         for (let i = 0; i < 3; i++) part('decor', x, z, r, [-w * 0.2 + i * 0.12, y - d / 2 - 0.003, 0.055], [0.1, 0.02, 0.02], 'box', inks[i])
-        for (let i = 0; i < 6; i++) {
-          const len = 0.3 + rnd() * (w * 0.5)
-          part('decor', x, z, r, [-w / 2 + 0.15 + len / 2 + rnd() * 0.2, y + d / 2 - 0.18 - i * 0.14, 0.032], [len, 0.018, 0.002], 'box', inks[Math.floor(rnd() * inks.length)])
-        }
+        // The writing surface itself is live (drawn by BoardSurfaces), so no fake scribbles here.
         break
       }
       case 'bulletin_board':

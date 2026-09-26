@@ -31,8 +31,9 @@ export interface PdfState {
 export interface ScreenState {
   id: string;
   owner: string | null;
-  mode: 'share' | 'pdf' | null;
+  mode: 'share' | 'pdf' | 'browser' | null;
   pdf: PdfState | null;
+  url: string | null;
 }
 
 export interface ChatMessage {
@@ -173,7 +174,8 @@ export interface LivekitTokenReply {
 
 export interface ScreenClaimPayload {
   screenId: string;
-  mode: 'share' | 'pdf';
+  mode: 'share' | 'pdf' | 'browser';
+  url?: string;
 }
 export interface ScreenClaimReply {
   screen: ScreenState;
@@ -250,6 +252,14 @@ export interface PrankPayload {
   deskId: string;
 }
 
+export interface BrowserTokenPayload {
+  screenId: string;
+}
+export interface BrowserTokenReply {
+  token: string;
+  control: boolean;
+}
+
 export interface ClientEvents {
   move: { payload: MovePayload; reply: null };
   media_state: { payload: MediaStatePayload; reply: null };
@@ -268,6 +278,7 @@ export interface ClientEvents {
   toss: { payload: TossPayload; reply: null };
   alarm_pull: { payload: AlarmPullPayload; reply: null };
   prank: { payload: PrankPayload; reply: null };
+  browser_token: { payload: BrowserTokenPayload; reply: BrowserTokenReply };
 }
 
 export interface BatchEvent {
@@ -346,5 +357,5 @@ export interface ServerEvents {
 
 export type ProtocolError = 'bad_payload' | 'unknown_event' | 'rate_limited' | 'busy' | 'not_owner' | 'too_far' | 'unknown_screen' | 'unknown_prop' | 'livekit_disabled' | 'cooldown';
 
-export const CLIENT_EVENTS = ["move","media_state","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","prop_use","toss","alarm_pull","prank"] as const;
+export const CLIENT_EVENTS = ["move","media_state","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","prop_use","toss","alarm_pull","prank","browser_token"] as const;
 export const SERVER_EVENTS = ["batch","correction","screen_update","chat","reaction","board_stroke","board_clear","sticker_update","prop_event","toss","scores","drill","desk_update"] as const;

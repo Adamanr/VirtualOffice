@@ -13,7 +13,8 @@ defmodule Office.Screens do
           id: String.t(),
           owner: String.t() | nil,
           mode: String.t() | nil,
-          pdf: map() | nil
+          pdf: map() | nil,
+          url: String.t() | nil
         }
   @type t :: %{String.t() => screen()}
 
@@ -23,7 +24,7 @@ defmodule Office.Screens do
   @spec new(Level.t()) :: t()
   def new(%Level{screens: defs}), do: Map.new(defs, fn {id, _} -> {id, empty(id)} end)
 
-  defp empty(id), do: %{id: id, owner: nil, mode: nil, pdf: nil}
+  defp empty(id), do: %{id: id, owner: nil, mode: nil, pdf: nil, url: nil}
 
   @doc "Screens that are in use (the rest are implicitly empty)."
   def active(screens),
@@ -31,7 +32,7 @@ defmodule Office.Screens do
 
   @spec claim(t(), String.t(), String.t(), String.t()) ::
           {:ok, t(), [screen()]} | {:error, :unknown_screen | :busy}
-  def claim(screens, id, player, mode) when mode in ["share", "pdf"] do
+  def claim(screens, id, player, mode, url \\ nil) when mode in ["share", "pdf", "browser"] do
     case Map.fetch(screens, id) do
       :error ->
         {:error, :unknown_screen}
@@ -42,7 +43,15 @@ defmodule Office.Screens do
       {:ok, screen} ->
         {screens, released} = release_all(screens, player, except: id)
         pdf = if screen.mode == mode, do: screen.pdf, else: nil
-        claimed = %{screen | owner: player, mode: mode, pdf: pdf}
+
+        claimed = %{
+          screen
+          | owner: player,
+            mode: mode,
+            pdf: pdf,
+            url: if(mode == "browser", do: url)
+        }
+
         {:ok, Map.put(screens, id, claimed), released ++ [claimed]}
     end
   end
@@ -97,6 +106,22 @@ defmodule Office.Screens do
       {:ok, %{owner: ^player} = screen} -> {:ok, screen}
       {:ok, _} -> {:error, :not_owner}
     end
+  end
+
+  @doc "Whether a player in `zone` at `{x, z}` can see the screen (same zone, near for desk monitors)."
+  def can_see?(%{zone_id: zone_id} = screen, zone, pos) do
+    zone == zone_id and
+      case {screen.view_distance, pos} do
+        {nil, _} ->
+          true
+
+        {_, nil} ->
+          false
+
+        {d, {x, z}} ->
+          {sx, _y, sz} = screen.position
+          :math.sqrt((x - sx) ** 2 + (z - sz) ** 2) <= d
+      end
   end
 
   @doc "Whether a player in `zone` at `{x, z}` may present on the screen."

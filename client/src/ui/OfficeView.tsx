@@ -20,6 +20,7 @@ import { Jellos } from '../scene/Jellos'
 import { Scoreboard } from '../scene/Scoreboard'
 import { DrillFx } from '../scene/DrillFx'
 import { ActivityHud } from './ActivityHud'
+import { BrowserMenuItem, BrowserOverlay } from '../browser/BrowserUi'
 import { InteractionMenu, InteractionPrompt, ScreenOverlay } from './ScreenUi'
 import { IntranetMenuItem, PropMenu, PropOverlays, PropPrompt } from './PropUi'
 import '../screens/actions'
@@ -86,6 +87,7 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       <InteractionMenu
         extra={(id) => (
           <>
+            <BrowserMenuItem screenId={id} />
             <IntranetMenuItem />
             <PdfMenuItems screenId={id} />
           </>
@@ -94,7 +96,7 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       <PropMenu />
       <ActivityHud />
       <PdfHint />
-      <ScreenOverlay renderPdf={(id) => <PdfOverlay screenId={id} />} />
+      <ScreenOverlay renderPdf={(id) => <PdfOverlay screenId={id} />} renderBrowser={(id) => <BrowserOverlay screenId={id} />} />
       <PropOverlays />
       <PdfDropZone />
       <ChatPanel />

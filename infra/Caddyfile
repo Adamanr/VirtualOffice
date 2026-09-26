@@ -13,6 +13,10 @@
 	handle /api/* {
 		reverse_proxy 127.0.0.1:4000
 	}
+	# Shared browser on office computers (frames + input over WebSocket).
+	handle /browser/* {
+		reverse_proxy 127.0.0.1:4100
+	}
 	# LiveKit signalling on the same origin: wss://<domain>/lk/rtc -> 127.0.0.1:7880/rtc
 	handle_path /lk/* {
 		reverse_proxy 127.0.0.1:7880

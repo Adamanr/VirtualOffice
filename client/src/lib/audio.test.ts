@@ -7,6 +7,7 @@ import {
   HEAR_MAX,
   panFor,
   pickVideoTiles,
+  screenAudibility,
   SUBSCRIBE_RADIUS,
   UNSUBSCRIBE_RADIUS,
   volumeAtDistance,
@@ -111,5 +112,25 @@ describe('pickVideoTiles', () => {
       2,
     )
     expect(ids).toEqual(['near', 'mid'])
+  })
+})
+
+describe('screenAudibility (shared browser sound)', () => {
+  const hall = level.screens.find((s) => s.id === 'hall_screen')!
+  const desk = level.screens.find((s) => s.kind === 'desk')!
+
+  it('fills an isolated room and stays inside it', () => {
+    expect(screenAudibility(at(6, -12), hall, isolated)).toBe(1)
+    expect(screenAudibility(at(2, -5), hall, isolated)).toBe(0)
+  })
+
+  it('fades around a desk monitor', () => {
+    const near = at(desk.position[0] + 1, desk.position[2])
+    const mid = at(desk.position[0] + 3.5, desk.position[2])
+    const far = at(desk.position[0] + 8, desk.position[2])
+    expect(screenAudibility(near, desk, isolated)).toBe(1)
+    expect(screenAudibility(mid, desk, isolated)).toBeGreaterThan(0)
+    expect(screenAudibility(mid, desk, isolated)).toBeLessThan(1)
+    expect(screenAudibility(far, desk, isolated)).toBe(0)
   })
 })

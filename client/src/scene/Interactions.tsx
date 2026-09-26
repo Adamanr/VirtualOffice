@@ -1,14 +1,16 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { onKey } from '../input/keyboard'
-import { canSeeScreen } from '../lib/audio'
-import { getSeat, level, props, seats, zoneAt } from '../lib/level'
+import { canSeeScreen, panFor, screenAudibility } from '../lib/audio'
+import { allStreams } from '../browser/stream'
+import { useTabVolume, volumeOf } from '../browser/volume'
+import { getScreen, getSeat, getZone, level, props, seats, zoneAt } from '../lib/level'
 import { openOverlay } from '../screens/actions'
 import { sit, standUp } from '../screens/seats'
 import { closePropOverlay, sameTarget, useGame, type Target } from '../store/game'
 import { useActivity } from '../store/activity'
 import { leaveActivity } from '../activities/games'
-import { local } from '../store/local'
+import { cameraState, local } from '../store/local'
 import { useScreens } from '../store/screens'
 
 const DESK_RANGE = 1.3
@@ -111,6 +113,7 @@ function findTarget(): Target | null {
 function updateVisibleScreens() {
   const { x, z } = local.position
   const me = { x, z, zoneId: zoneAt(level, x, z)?.id ?? null }
+  updateTabAudio(me)
   const { states, visible } = useScreens.getState()
   const next: Record<string, boolean> = {}
   for (const id of Object.keys(states)) {
@@ -120,4 +123,23 @@ function updateVisibleScreens() {
   const a = Object.keys(visible)
   const b = Object.keys(next)
   if (a.length !== b.length || b.some((id) => !visible[id])) useScreens.setState({ visible: next })
+}
+
+/** Shared-browser sound: loudness by distance/room × your volume, panned to where the screen is. */
+function updateTabAudio(me: { x: number; z: number; zoneId: string | null }) {
+  const listener = { ...me, yaw: cameraState.yaw }
+  const states = useScreens.getState().states
+  let nearest: { screenId: string; level: number } | null = null
+  for (const stream of allStreams()) {
+    const screen = getScreen(stream.screenId)
+    const browsing = states[stream.screenId]?.mode === 'browser'
+    const level = screen && browsing ? screenAudibility(me, screen, (id) => getZone(id)?.isolated ?? false) : 0
+    const gain = level * volumeOf(stream.screenId)
+    const pan = screen ? panFor(listener, { x: screen.position[0], z: screen.position[2], zoneId: screen.zoneId }, Math.hypot(screen.position[0] - me.x, screen.position[2] - me.z)) : 0
+    stream.audio.set(gain, pan * 0.6)
+    stream.setAudioEnabled(gain > 0.001)
+    if (level > 0 && (!nearest || level > nearest.level)) nearest = { screenId: stream.screenId, level }
+  }
+  const prev = useTabVolume.getState().nearest
+  if (prev?.screenId !== nearest?.screenId || Math.abs((prev?.level ?? 0) - (nearest?.level ?? 0)) > 0.05) useTabVolume.setState({ nearest })
 }

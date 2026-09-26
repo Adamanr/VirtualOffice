@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { getConnection } from '../net/session'
 
 import { VIEWPORT } from './input'
+import { TabAudio } from './audio'
 
 export { VIEWPORT }
 
@@ -33,6 +34,10 @@ class BrowserStream {
   private pending: Blob | null = null
   private closed = false
   readonly screenId: string
+  readonly audio = new TabAudio()
+  /** The presenter's cursor on the page (page pixels), for everyone. */
+  readonly cursor = { x: VIEWPORT.width / 2, y: VIEWPORT.height / 2 }
+  private audioOn = true
 
   constructor(screenId: string) {
     this.screenId = screenId
@@ -62,6 +67,13 @@ class BrowserStream {
     if (this.ws?.readyState === WebSocket.OPEN && useBrowsers.getState()[this.screenId]?.control) this.ws.send(JSON.stringify(msg))
   }
 
+  /** Turns this tab's sound on/off for us only (muted viewers get no audio at all). */
+  setAudioEnabled(on: boolean) {
+    if (on === this.audioOn) return
+    this.audioOn = on
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: 'audio', on }))
+  }
+
   private patch(p: Partial<BrowserInfo>) {
     useBrowsers.setState((s) => ({
       [this.screenId]: { url: '', title: '', loading: false, control: false, status: 'connecting', error: null, ...s[this.screenId], ...p },
@@ -84,18 +96,31 @@ class BrowserStream {
     this.patch({ control: reply.control })
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
     const ws = new WebSocket(`${proto}://${location.host}/browser/ws?token=${encodeURIComponent(reply.token)}`)
-    ws.binaryType = 'blob'
+    ws.binaryType = 'arraybuffer'
     this.ws = ws
+    ws.onopen = () => {
+      if (!this.audioOn) ws.send(JSON.stringify({ t: 'audio', on: false }))
+    }
     ws.onmessage = (e) => {
       if (typeof e.data === 'string') {
         try {
-          const msg = JSON.parse(e.data) as { t: string; url?: string; title?: string; loading?: boolean; message?: string }
+          const msg = JSON.parse(e.data) as { t: string; url?: string; title?: string; loading?: boolean; message?: string; x?: number; y?: number }
+          if (msg.t === 'cursor' && !useBrowsers.getState()[this.screenId]?.control) {
+            this.cursor.x = msg.x ?? this.cursor.x
+            this.cursor.y = msg.y ?? this.cursor.y
+          }
           if (msg.t === 'info') this.patch({ url: msg.url ?? '', title: msg.title ?? '', loading: !!msg.loading, status: 'live', error: null })
           if (msg.t === 'error') this.patch({ error: msg.message ?? 'Ошибка' })
         } catch {
           /* ignore */
         }
-      } else this.frame(e.data as Blob)
+      } else {
+        // Binary: first byte is the type — 1 = JPEG frame, 2 = PCM audio.
+        const data = e.data as ArrayBuffer
+        const type = new Uint8Array(data, 0, 1)[0]
+        if (type === 1) this.frame(new Blob([data.slice(1)], { type: 'image/jpeg' }))
+        else if (type === 2) this.audio.push(data.slice(1))
+      }
     }
     ws.onclose = (e) => {
       if (this.ws !== ws) return
@@ -149,6 +174,7 @@ class BrowserStream {
 
   private shutdown() {
     this.closed = true
+    this.audio.set(0, 0)
     if (this.retry) window.clearTimeout(this.retry)
     this.retry = null
     this.ws?.close()
@@ -172,4 +198,9 @@ export function resetBrowserStream(screenId: string) {
     delete next[screenId]
     return next
   }, true)
+}
+
+/** Streams currently created (for the spatial audio loop). */
+export function allStreams(): BrowserStream[] {
+  return [...streams.values()]
 }

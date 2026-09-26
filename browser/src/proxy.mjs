@@ -8,6 +8,11 @@ import { resolvePublic } from './netguard.mjs'
  * vetted IP, so the page cannot reach internal services — not via fetch, not
  * via WebSocket, not via DNS rebinding.
  */
+const BLOCKED_PAGE = `<!doctype html><meta charset="utf-8"><title>Недоступно</title>
+<body style="font:16px system-ui;display:grid;place-items:center;height:90vh;color:#333;background:#f6f5f1">
+<div style="text-align:center"><div style="font-size:64px">🚫</div><h2>Этот адрес недоступен из офисного браузера</h2>
+<p>Можно открывать только сайты в интернете — внутренняя сеть и localhost закрыты.</p></div></body>`
+
 export function startProxy({ port = 0, allowPrivate = false, log = () => {} } = {}) {
   const server = http.createServer(async (req, res) => {
     // Plain HTTP: absolute-form request URI.
@@ -21,7 +26,7 @@ export function startProxy({ port = 0, allowPrivate = false, log = () => {} } = 
     const ip = await resolvePublic(target.hostname, { allowPrivate })
     if (!ip || target.protocol !== 'http:') {
       log('blocked', target.hostname)
-      res.writeHead(403, { 'content-type': 'text/plain' }).end('Blocked by office network policy')
+      res.writeHead(403, { 'content-type': 'text/html; charset=utf-8' }).end(BLOCKED_PAGE)
       return
     }
     const upstream = http.request(

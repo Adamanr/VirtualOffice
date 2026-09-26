@@ -10,6 +10,7 @@ import { cameraState, local } from '../store/local'
 import { useGame } from '../store/game'
 import { usePlayers } from '../store/players'
 import { useActivity } from '../store/activity'
+import { useScreens } from '../store/screens'
 import { Avatar } from './Avatar'
 
 const WALK_SPEED = 3
@@ -103,7 +104,10 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
       v.position.copy(local.position)
       v.rotation.y = local.rotY
       // The desk camera sits where our head is; so does a camera squeezed against a wall.
-      v.visible = getSeat(useGame.getState().seat)?.kind !== 'desk' && (useGame.getState().cameraMode === 'top' || cameraState.current > 0.7)
+      v.visible =
+        getSeat(useGame.getState().seat)?.kind !== 'desk' &&
+        !useScreens.getState().focus &&
+        (useGame.getState().cameraMode === 'top' || cameraState.current > 0.7)
     }
   })
 

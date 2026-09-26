@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { getScreen, getSeat, screenLabel } from '../lib/level'
 import { closeOverlay, openOverlay, shareScreen, stopPresenting } from '../screens/actions'
 import { standUp } from '../screens/seats'
+import { enterFocus } from '../browser/focus'
 import { useGame } from '../store/game'
 import { useMedia } from '../store/media'
 import { usePlayers } from '../store/players'
@@ -101,6 +102,11 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
           {!mediaOk && <div className="muted small">Демонстрация недоступна: нет соединения с медиасервером</div>}
           {extra?.(screen.id)}
         </>
+      )}
+      {screen && state?.mode === 'browser' && mine && (
+        <button className="btn primary" onClick={() => enterFocus(screen.id)}>
+          🖱 Войти в экран (или клик по нему)
+        </button>
       )}
       {screen && state && mine && (
         <>

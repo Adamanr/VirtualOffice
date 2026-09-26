@@ -91,3 +91,25 @@ export function pickVideoTiles(
     .slice(0, max)
     .map((c) => c.id)
 }
+
+/**
+ * How loud a shared browser tab on a screen is for the listener (0..1).
+ * Room screens: everyone in the room (isolated rooms: full volume anywhere in
+ * it; open areas fade from 4 m to 14 m). Desk monitors: full within 1.5 m,
+ * fading to silence at the monitor's view distance. Other zones: silent.
+ */
+export function screenAudibility(
+  listener: Point,
+  screen: { zoneId: string; position: [number, number, number]; viewDistance?: number; kind?: string },
+  isIsolated: (zoneId: string | null) => boolean,
+): number {
+  if (listener.zoneId !== screen.zoneId) return 0
+  const d = Math.hypot(screen.position[0] - listener.x, screen.position[2] - listener.z)
+  if (screen.kind !== 'desk' && isIsolated(screen.zoneId)) return 1
+  const full = screen.kind === 'desk' ? 1.5 : 4
+  const max = screen.kind === 'desk' ? (screen.viewDistance ?? 6) : 14
+  if (d <= full) return 1
+  if (d >= max) return 0
+  const t = (d - full) / (max - full)
+  return (1 - t) * (1 - t)
+}

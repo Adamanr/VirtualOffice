@@ -20,39 +20,28 @@ const log = (...args) => console.log(new Date().toISOString(), ...args)
 const proxy = await startProxy({ allowPrivate: ALLOW_PRIVATE, log })
 const proxyPort = proxy.address().port
 
-let browserPromise = null
-function getBrowser() {
-  browserPromise ??= puppeteer
-    .launch({
-      executablePath: CHROMIUM,
-      headless: true,
-      args: [
-        `--proxy-server=http://127.0.0.1:${proxyPort}`,
-        // Force even localhost through the proxy (Chromium bypasses loopback by default).
-        '--proxy-bypass-list=<-loopback>',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        '--mute-audio',
-        '--disable-extensions',
-        '--disable-background-networking',
-        '--disable-sync',
-        '--no-first-run',
-        '--lang=ru-RU,ru,en',
-      ],
-    })
-    .then((b) => {
-      b.on('disconnected', () => {
-        browserPromise = null
-        for (const s of sessions.values()) s.close()
-        sessions.clear()
-      })
-      return b
-    })
-    .catch((e) => {
-      browserPromise = null
-      throw e
-    })
-  return browserPromise
+const AUDIO = process.env.AUDIO !== '0'
+
+/** One Chromium per tab (so each tab's sound can go to its own audio sink). */
+function launch({ env }) {
+  return puppeteer.launch({
+    executablePath: CHROMIUM,
+    headless: true,
+    env,
+    args: [
+      `--proxy-server=http://127.0.0.1:${proxyPort}`,
+      // Force even localhost through the proxy (Chromium bypasses loopback by default).
+      '--proxy-bypass-list=<-loopback>',
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
+      '--autoplay-policy=no-user-gesture-required',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--no-first-run',
+      '--lang=ru-RU,ru,en',
+    ],
+  })
 }
 
 /** screenId → session */
@@ -64,7 +53,7 @@ async function sessionFor(claim) {
   if (!claim.c) return null // only the presenter starts a browser
   if (existing) await existing.close()
   if (sessions.size >= MAX_SESSIONS) throw new Error('busy')
-  const session = new BrowserSession(await getBrowser(), { screenId: claim.s, key: claim.k, startUrl: claim.u, log })
+  const session = new BrowserSession(launch, { screenId: claim.s, key: claim.k, startUrl: claim.u, log, audio: AUDIO })
   sessions.set(claim.s, session)
   try {
     await session.start()
@@ -120,7 +109,7 @@ async function onConnection(ws, claim) {
     } catch {
       return
     }
-    void session.handle(msg, claim.c === true)
+    void session.handle(msg, claim.c === true, ws)
   })
   ws.on('close', () => {
     clearInterval(refill)
@@ -136,7 +125,6 @@ server.listen(PORT, () => log(`office browser on :${PORT} (chromium: ${CHROMIUM 
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, async () => {
     for (const s of sessions.values()) await s.close()
-    await (await browserPromise?.catch(() => null))?.close()
     process.exit(0)
   })
 }

@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { onKey } from '../input/keyboard'
 import { getProp, getScreen, getSeat, propPoint } from '../lib/level'
 import { useActivity } from '../store/activity'
+import { useScreens } from '../store/screens'
 import { activitySpot, OCHE, TABLE_TOP } from '../activities/spots'
 import { useGame } from '../store/game'
 import { cameraState, local } from '../store/local'
@@ -38,6 +39,8 @@ export function CameraRig() {
     let startX = 0
     let startY = 0
     const down = (e: PointerEvent) => {
+      // While driving a browser screen the mouse belongs to the page.
+      if (document.pointerLockElement) return
       if (e.button !== 0 && e.button !== 2) return
       dragging = true
       startX = e.clientX
@@ -46,7 +49,7 @@ export function CameraRig() {
       el.setPointerCapture(e.pointerId)
     }
     const move = (e: PointerEvent) => {
-      if (!dragging) return
+      if (!dragging || document.pointerLockElement) return
       if (Math.hypot(e.clientX - startX, e.clientY - startY) > 4) pointerDrag.moved = true
       cameraState.yaw -= e.movementX * 0.005
       cameraState.pitch = THREE.MathUtils.clamp(cameraState.pitch + e.movementY * 0.004, 0.05, 1.35)
@@ -57,6 +60,7 @@ export function CameraRig() {
     }
     const wheel = (e: WheelEvent) => {
       e.preventDefault()
+      if (document.pointerLockElement) return
       cameraState.distance = THREE.MathUtils.clamp(cameraState.distance * (1 + e.deltaY * 0.001), MIN_DIST, MAX_DIST)
     }
     const menu = (e: Event) => e.preventDefault()
@@ -80,6 +84,26 @@ export function CameraRig() {
     const dt = Math.min(rawDt, 0.05)
     const { cameraMode, seat } = useGame.getState()
     target.set(local.position.x, local.position.y + HEAD, local.position.z)
+
+    // Inside a shared browser screen: frame it so the page fills the view.
+    const focusId = useScreens.getState().focus
+    const focusScreen = focusId ? getScreen(focusId) : undefined
+    if (focusScreen) {
+      const [sx, sy, sz] = focusScreen.position
+      const [w, h] = focusScreen.size
+      // The page is 16:10 letterboxed into the screen.
+      const pw = Math.min(w, h * 1.6)
+      const ph = pw / 1.6
+      const cam = camera as THREE.PerspectiveCamera
+      const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))
+      const d = Math.max((ph * 1.06) / 2 / tan, (pw * 1.06) / 2 / (tan * cam.aspect))
+      desired.set(sx + Math.sin(focusScreen.rotationY) * d, sy, sz + Math.cos(focusScreen.rotationY) * d)
+      lookAt.set(sx, sy, sz)
+      camera.position.lerp(desired, 1 - Math.exp(-dt * 10))
+      camera.up.copy(up)
+      camera.lookAt(lookAt)
+      return
+    }
 
     // Games: a fixed camera that shows what matters.
     const mode = useActivity.getState().mode

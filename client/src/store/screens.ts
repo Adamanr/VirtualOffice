@@ -11,6 +11,8 @@ interface ScreensState {
   overlay: string | null
   /** Screens the local player can currently see (same zone / near a desk monitor). */
   visible: Record<string, boolean>
+  /** Screen whose shared browser we are driving from inside the game (pointer locked). */
+  focus: string | null
 }
 
 export const useScreens = create<ScreensState>(() => ({
@@ -18,6 +20,7 @@ export const useScreens = create<ScreensState>(() => ({
   video: {},
   overlay: null,
   visible: {},
+  focus: null,
 }))
 
 export function setScreenState(screen: ScreenState) {

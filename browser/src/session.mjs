@@ -1,14 +1,21 @@
 import { normalizeUrl } from './netguard.mjs'
 import { toCdp, VIEWPORT } from './input.mjs'
+import { capture, createSink, destroySink } from './audio.mjs'
+
+// Binary messages to viewers start with a type byte.
+export const FRAME = 1
+export const AUDIO = 2
+const tagged = (type, buf) => Buffer.concat([Buffer.from([type]), buf])
 
 /**
  * One shared browser tab per office screen: its own incognito context, a JPEG
  * screencast broadcast to every viewer, and input from controllers only.
  */
 export class BrowserSession {
-  /** @param {import('puppeteer-core').Browser} browser */
-  constructor(browser, { screenId, key, startUrl, log }) {
-    this.browser = browser
+  /** @param {(opts: { env: object }) => Promise<import('puppeteer-core').Browser>} launch */
+  constructor(launch, { screenId, key, startUrl, log, audio = true }) {
+    this.launch = launch
+    this.audioEnabled = audio
     this.screenId = screenId
     this.key = key
     this.startUrl = startUrl
@@ -19,9 +26,18 @@ export class BrowserSession {
     this.mouse = { buttons: 0 }
     this.closed = false
     this.idleTimer = null
+    this.cursor = { x: VIEWPORT.width / 2, y: VIEWPORT.height / 2 }
+    this.lastCursorSent = 0
   }
 
   async start() {
+    // Each tab gets its own Chromium process so its sound goes to its own sink.
+    const sinkName = `office_${this.screenId.replace(/[^A-Za-z0-9_]/g, '_')}_${Date.now().toString(36)}`
+    this.sink = this.audioEnabled ? await createSink(sinkName) : null
+    this.browser = await this.launch({ env: this.sink ? { ...process.env, PULSE_SINK: this.sink.name } : process.env })
+    this.browser.on('disconnected', () => void this.close())
+    if (this.sink) this.stopAudio = capture(this.sink, (pcm) => this.broadcast(tagged(AUDIO, pcm), (ws) => ws.audioOn !== false))
+    this.log('session', this.screenId, this.sink ? `audio via ${this.sink.name}` : 'no audio')
     this.context = await this.browser.createBrowserContext()
     const page = (this.page = await this.context.newPage())
     await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 })
@@ -29,7 +45,7 @@ export class BrowserSession {
     await cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' }).catch(() => {})
     cdp.on('Page.screencastFrame', ({ data, sessionId }) => {
       cdp.send('Page.screencastFrameAck', { sessionId }).catch(() => {})
-      this.lastFrame = Buffer.from(data, 'base64')
+      this.lastFrame = tagged(FRAME, Buffer.from(data, 'base64'))
       this.broadcast(this.lastFrame)
     })
     await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 62, maxWidth: VIEWPORT.width, maxHeight: VIEWPORT.height, everyNthFrame: 1 })
@@ -67,8 +83,14 @@ export class BrowserSession {
   }
 
   /** Handles a message from a viewer; only controllers may drive the page. */
-  async handle(msg, canControl) {
-    if (!canControl || this.closed) return
+  async handle(msg, canControl, ws) {
+    if (this.closed) return
+    // Anyone may mute the tab for themselves (saves bandwidth too).
+    if (msg?.t === 'audio') {
+      ws.audioOn = msg.on !== false
+      return
+    }
+    if (!canControl) return
     switch (msg?.t) {
       case 'nav':
         return this.navigate(msg.url)
@@ -80,7 +102,17 @@ export class BrowserSession {
         return this.page.reload({ timeout: 20000 }).catch(() => {})
       default: {
         const cmd = toCdp(msg, this.mouse)
-        if (cmd) await this.cdp.send(cmd.method, cmd.params).catch(() => {})
+        if (!cmd) return
+        // Everyone sees where the presenter's cursor is.
+        if (msg.t === 'mouse' || msg.t === 'wheel') {
+          this.cursor = { x: cmd.params.x, y: cmd.params.y }
+          const now = Date.now()
+          if (now - this.lastCursorSent > 50) {
+            this.lastCursorSent = now
+            this.send({ t: 'cursor', ...this.cursor })
+          }
+        }
+        await this.cdp.send(cmd.method, cmd.params).catch(() => {})
       }
     }
   }
@@ -89,6 +121,7 @@ export class BrowserSession {
     clearTimeout(this.idleTimer)
     this.viewers.add(ws)
     ws.send(JSON.stringify(this.info))
+    ws.send(JSON.stringify({ t: 'cursor', ...this.cursor }))
     if (this.lastFrame) ws.send(this.lastFrame)
   }
 
@@ -101,8 +134,9 @@ export class BrowserSession {
     this.broadcast(JSON.stringify(msg))
   }
 
-  broadcast(data) {
+  broadcast(data, filter = () => true) {
     for (const ws of this.viewers) {
+      if (!filter(ws)) continue
       // Slow viewers skip frames instead of queueing seconds of video.
       if (typeof data !== 'string' && ws.bufferedAmount > 1_500_000) continue
       if (ws.readyState === 1) ws.send(data)
@@ -115,6 +149,8 @@ export class BrowserSession {
     clearTimeout(this.idleTimer)
     for (const ws of this.viewers) ws.close(4000, 'session closed')
     this.viewers.clear()
-    await this.context?.close().catch(() => {})
+    this.stopAudio?.()
+    await this.browser?.close().catch(() => {})
+    await destroySink(this.sink)
   }
 }

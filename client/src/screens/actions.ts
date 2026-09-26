@@ -5,6 +5,7 @@ import { notify, useGame } from '../store/game'
 import { usePlayers } from '../store/players'
 import { setScreenState, useScreens } from '../store/screens'
 import { resetBrowserStream } from '../browser/stream'
+import { exitFocus } from '../browser/focus'
 
 const REASONS: Record<string, string> = {
   busy: 'Этот экран уже занят другим докладчиком',
@@ -57,6 +58,8 @@ onSession((conn) => {
     }
     setScreenState(screen)
     const self = usePlayers.getState().selfId
+    // Our browser screen ended or was taken over: leave it.
+    if (useScreens.getState().focus === screen.id && (screen.mode !== 'browser' || screen.owner !== self)) exitFocus()
     // Lost the screen (e.g. claimed another one): stop publishing to it.
     if (media.sharingScreenId === screen.id && screen.owner !== self) media.stopScreenShare()
   })

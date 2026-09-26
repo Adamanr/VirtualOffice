@@ -18,6 +18,20 @@ function context(): AudioContext | null {
   }
 }
 
+// Browsers only let an AudioContext start inside a user gesture: unlock it on
+// the first click / key press (and again if the browser suspends it later).
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    const ctx = context()
+    if (ctx?.state === 'running') {
+      window.removeEventListener('pointerdown', unlock, true)
+      window.removeEventListener('keydown', unlock, true)
+    }
+  }
+  window.addEventListener('pointerdown', unlock, true)
+  window.addEventListener('keydown', unlock, true)
+}
+
 export class TabAudio {
   private gain: GainNode | null = null
   private pan: StereoPannerNode | null = null

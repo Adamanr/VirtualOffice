@@ -6,6 +6,7 @@ import { Nameplate } from '../scene/Nameplate'
 import { RemotePlayers } from '../scene/RemotePlayers'
 import { Scene } from '../scene/Scene'
 import { usePlayers } from '../store/players'
+import { useScreens } from '../store/screens'
 import { useProfile } from '../store/profile'
 import { HelpHint, TopBar } from './Hud'
 import { MediaBanners, MediaControls, VideoTiles } from './MediaHud'
@@ -50,6 +51,8 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
   const color = useProfile((s) => s.color)
   const selfId = usePlayers((s) => s.selfId)
   const joinError = usePlayers((s) => s.joinError)
+  // Inside a browser screen the mouse belongs to the page: hide every panel it couldn't reach.
+  const inScreen = useScreens((s) => !!s.focus)
 
   useEffect(() => {
     startSession(spaceId, { name, color })
@@ -72,7 +75,7 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
   }
 
   return (
-    <div className="office">
+    <div className={`office${inScreen ? ' in-screen' : ''}`}>
       <Scene color={color} self={selfId ? <Nameplate id={selfId} /> : null}>
         <NetSync />
         <MediaSync />

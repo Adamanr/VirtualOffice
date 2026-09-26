@@ -29,6 +29,8 @@ function launch({ env }) {
     executablePath: CHROMIUM,
     headless: true,
     env,
+    // Puppeteer mutes headless Chromium by default; we capture the tab's sound.
+    ignoreDefaultArgs: ['--mute-audio'],
     args: [
       `--proxy-server=http://127.0.0.1:${proxyPort}`,
       // Force even localhost through the proxy (Chromium bypasses loopback by default).

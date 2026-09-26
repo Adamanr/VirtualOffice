@@ -1,7 +1,7 @@
 import { setKeyboardActive } from '../input/keyboard'
 import { useScreens } from '../store/screens'
 import { usePlayers } from '../store/players'
-import { notify } from '../store/game'
+import { notify, useGame } from '../store/game'
 import { modifiers, VIEWPORT } from './input'
 import { browserStream, useBrowsers } from './stream'
 
@@ -26,6 +26,7 @@ export function enterFocus(screenId: string) {
   const mine = useScreens.getState().states[screenId]?.owner === usePlayers.getState().selfId
   if (!canvas || !(mine || useBrowsers.getState()[screenId]?.control)) return
   useScreens.setState({ focus: screenId, overlay: null })
+  useGame.setState({ menuOpen: false })
   // Pointer lock can be refused (no user gesture, embedded frame, some browsers):
   // then drive the page from the 2D window instead.
   const fallback = () => {

@@ -223,3 +223,7 @@ kbd { font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12); bo
 .annot-sep { width: 70%; height: 1px; background: var(--border); margin: 2px 0; }
 .swatch.small { width: 22px; height: 22px; }
 .annot-locked { max-width: 90px; text-align: center; }
+
+/* Inside a browser screen: only the 3D view, the hint and the cinema stay. */
+.office.in-screen > :not(:first-child):not(.focus-hint):not(.cinema) { display: none !important; }
+.office.in-screen .nameplate { display: none; }

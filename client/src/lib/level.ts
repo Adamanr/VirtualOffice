@@ -71,6 +71,9 @@ export type FurnitureType =
   | 'podium'
   | 'rug'
   | 'fire_alarm'
+  | 'pingpong_table'
+  | 'dartboard'
+  | 'piano'
 
 export interface LevelFurniture {
   type: FurnitureType
@@ -253,6 +256,9 @@ export type PropKind =
   | 'fridge'
   | 'copier'
   | 'fire_alarm'
+  | 'pingpong_table'
+  | 'dartboard'
+  | 'piano'
 
 const PROP_KINDS = new Set<FurnitureType>([
   'whiteboard',
@@ -264,6 +270,9 @@ const PROP_KINDS = new Set<FurnitureType>([
   'fridge',
   'copier',
   'fire_alarm',
+  'pingpong_table',
+  'dartboard',
+  'piano',
 ])
 
 export interface Prop {
@@ -291,6 +300,9 @@ const PROP_META: Record<PropKind, { label: string; prompt: string; range: number
   fridge: { label: 'Холодильник', prompt: 'открыть холодильник', range: 1.3, defaultSize: [0.8, 1.9], elevation: 0.95 },
   copier: { label: 'Ксерокс', prompt: 'напечатать', range: 1.4, defaultSize: [1.0, 0.9], elevation: 0.45 },
   fire_alarm: { label: 'Пожарная тревога', prompt: 'пожарная тревога', range: 1.3, defaultSize: [0.18, 0.24], elevation: 1.35 },
+  pingpong_table: { label: 'Пинг-понг', prompt: 'сыграть в пинг-понг', range: 2.4, defaultSize: [1.525, 2.74], elevation: 0.76 },
+  dartboard: { label: 'Дартс', prompt: 'дартс', range: 3.2, defaultSize: [0.46, 0.46], elevation: 1.73 },
+  piano: { label: 'Пианино', prompt: 'сыграть на пианино', range: 1.8, defaultSize: [1.5, 0.6], elevation: 1.0 },
 }
 
 /** Derives interactable props from furniture. Pure, covered by tests. */

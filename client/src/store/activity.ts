@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DrillState, Score, Toss } from '@shared/protocol.gen'
+import type { Dart, DrillState, PongState, Score, Toss } from '@shared/protocol.gen'
 
 /** Things a player can visibly hold for a while after an activity. */
 export type HeldItem = 'coffee' | 'water' | 'snack' | 'paper' | 'popcorn' | 'yogurt' | 'cake' | 'lunch'
@@ -20,6 +20,14 @@ interface ActivityState {
   devices: Record<string, { state: DeviceState; until: number }>
   /** Paper avalanches left on the floor next to the copier. */
   piles: { id: string; x: number; z: number; until: number }[]
+  /** Ping-pong tables (server state) and when each state arrived (local ms). */
+  pongs: Record<string, PongState>
+  /** Darts stuck in each board. */
+  darts: Record<string, Dart[]>
+  /** Darts in flight: from the thrower's hand to the board. */
+  flying: { dart: Dart; from: [number, number, number]; start: number }[]
+  /** Game the local player is in (locked in place, special camera). */
+  mode: { kind: 'pong' | 'darts' | 'piano'; propId: string; side?: 'a' | 'b' } | null
 }
 
 export const useActivity = create<ActivityState>(() => ({
@@ -31,10 +39,14 @@ export const useActivity = create<ActivityState>(() => ({
   tosses: [],
   devices: {},
   piles: [],
+  pongs: {},
+  darts: {},
+  flying: [],
+  mode: null,
 }))
 
 export function resetActivity() {
-  useActivity.setState({ scores: [], drill: null, jellos: {}, held: {}, bubbles: {}, tosses: [], devices: {}, piles: [] })
+  useActivity.setState({ scores: [], drill: null, jellos: {}, held: {}, bubbles: {}, tosses: [], devices: {}, piles: [], pongs: {}, darts: {}, flying: [], mode: null })
 }
 
 export function hold(playerId: string, item: HeldItem, seconds = 40, color?: string) {
@@ -52,6 +64,12 @@ export function setDevice(propId: string, state: DeviceState, seconds: number) {
 /** Gestures read every frame by avatars (outside React). */
 export type Gesture = 'use' | 'kick' | 'hop' | 'throw' | 'bonk' | 'shiver'
 export const gestures = new Map<string, { type: Gesture; start: number; duration: number }>()
+
+/** Local receive time (performance.now) of each table's latest state, for ball extrapolation. */
+export const pongReceivedAt = new Map<string, number>()
+
+/** When each dart hit its board (for the floating score). */
+export const dartLandedAt = new Map<string, number>()
 
 export function gesture(playerId: string, type: Gesture, duration = 0.8) {
   gestures.set(playerId, { type, start: performance.now(), duration: duration * 1000 })

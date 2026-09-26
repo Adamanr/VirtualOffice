@@ -435,6 +435,41 @@ export function buildLevelGeometry(level: Level): LevelGeometry {
         part('dark', x, z, r, [0, b + 1.25, 0.18], [0.02, 0.25, 0.02])
         collider(x, z, r, [0, b + 0.57, 0], [0.7, 1.14, 0.5])
         break
+      case 'pingpong_table': {
+        // Regulation 1.525 × 2.74 m, 76 cm high; the net across the middle.
+        part('decor', x, z, r, [0, 0.745, 0], [w, 0.03, d], 'box', '#1f5f8b')
+        part('white', x, z, r, [0, 0.761, 0], [0.02, 0.003, d])
+        part('white', x, z, r, [-w / 2 + 0.01, 0.761, 0], [0.02, 0.003, d])
+        part('white', x, z, r, [w / 2 - 0.01, 0.761, 0], [0.02, 0.003, d])
+        part('white', x, z, r, [0, 0.761, -d / 2 + 0.01], [w, 0.003, 0.02])
+        part('white', x, z, r, [0, 0.761, d / 2 - 0.01], [w, 0.003, 0.02])
+        part('dark', x, z, r, [0, 0.835, 0], [w + 0.3, 0.15, 0.01])
+        part('white', x, z, r, [0, 0.905, 0], [w + 0.3, 0.012, 0.012])
+        for (const [lx, lz] of [[-0.6, -1.1], [0.6, -1.1], [-0.6, 1.1], [0.6, 1.1]] as const) part('deskLeg', x, z, r, [lx, 0.365, lz], [0.05, 0.73, 0.05])
+        collider(x, z, r, [0, 0.38, 0], [w, 0.76, d])
+        break
+      }
+      case 'dartboard':
+        // Wooden cabinet behind the board (the board face is live, drawn by DartsBoard).
+        part('wood', x, z, r, [0, y, 0.02], [0.62, 0.62, 0.04])
+        part('wood', x, z, r, [-0.36, y, 0.1], [0.04, 0.62, 0.2])
+        part('wood', x, z, r, [0.36, y, 0.1], [0.04, 0.62, 0.2])
+        // Oche: the throw line on the floor 2.37 m away.
+        part('decor', x, z, r, [0, 0.008, 2.37], [0.9, 0.012, 0.05], 'box', '#c8322f')
+        break
+      case 'piano': {
+        // Upright piano, keys facing +Z; the playable keys are drawn by PianoKeys.
+        part('decor', x, z, r, [0, b + 0.62, -0.08], [w, 1.24, d - 0.2], 'box', '#2a1a12')
+        part('decor', x, z, r, [0, b + 0.72, d / 2 - 0.12], [w, 0.06, 0.34], 'box', '#2a1a12')
+        part('decor', x, z, r, [0, b + 0.35, d / 2 - 0.2], [w - 0.1, 0.7, 0.04], 'box', '#3a2418')
+        part('decor', x, z, r, [-w / 2 + 0.03, b + 0.5, d / 2 - 0.12], [0.06, 1.0, 0.34], 'box', '#2a1a12')
+        part('decor', x, z, r, [w / 2 - 0.03, b + 0.5, d / 2 - 0.12], [0.06, 1.0, 0.34], 'box', '#2a1a12')
+        part('paper', x, z, r, [-0.12, b + 1.1, 0.04], [0.22, 0.28, 0.01]) // sheet music
+        part('paper', x, z, r, [0.12, b + 1.1, 0.04], [0.22, 0.28, 0.01])
+        part('decor', x, z, r, [0, b + 0.22, 0.75], [0.8, 0.44, 0.35], 'box', '#2a1a12') // bench
+        collider(x, z, r, [0, b + 0.62, 0], [w, 1.24, d])
+        break
+      }
       case 'fire_alarm':
         part('decor', x, z, r, [0, y, 0.035], [0.16, 0.22, 0.07], 'box', '#c8322f')
         part('white', x, z, r, [0, y - 0.02, 0.072], [0.1, 0.05, 0.02])

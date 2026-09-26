@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { JoinParams } from '@shared/protocol.gen'
+import type { JoinParams, JoinReply } from '@shared/protocol.gen'
 import { local } from '../store/local'
 import { usePlayers } from '../store/players'
 import { useScreens } from '../store/screens'
@@ -32,6 +32,14 @@ export function syncPosition() {
 type Listener = (c: SpaceConnection) => void
 const listeners = new Set<Listener>()
 
+const joinListeners = new Set<(reply: JoinReply) => void>()
+
+/** Called with the join snapshot on every (re)join. */
+export function onJoined(l: (reply: JoinReply) => void): () => void {
+  joinListeners.add(l)
+  return () => joinListeners.delete(l)
+}
+
 /** Lets feature modules (screens, chat, media) subscribe to channel events of each new session. */
 export function onSession(l: Listener): () => void {
   listeners.add(l)
@@ -54,6 +62,7 @@ export function startSession(spaceId: string, profile: Omit<JoinParams, 'playerI
         useScreens.setState({ states: Object.fromEntries(reply.screens.map((sc) => [sc.id, sc])) })
         setHistory(reply.chat)
         hydrateProps(reply.boards ?? [], reply.stickers ?? [], reply.props ?? [])
+        joinListeners.forEach((l) => l(reply))
         useActivity.setState({
           scores: reply.scores ?? [],
           drill: reply.drill ?? null,

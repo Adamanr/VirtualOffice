@@ -133,6 +133,30 @@ export interface Jello {
   by: string;
 }
 
+export interface PongState {
+  id: string;
+  a: string | null;
+  b: string | null;
+  pa: number;
+  pb: number;
+  ball: number[];
+  sa: number;
+  sb: number;
+  status: 'idle' | 'point' | 'playing' | 'won';
+  winner: string | null;
+  t: number;
+}
+
+export interface Dart {
+  id: string;
+  boardId: string;
+  by: string;
+  u: number;
+  v: number;
+  points: number;
+  ring: string;
+}
+
 export interface JoinParams {
   playerId: string;
   name: string;
@@ -151,6 +175,8 @@ export interface JoinReply {
   scores: Score[];
   drill: DrillState;
   jellos: Jello[];
+  pongs: PongState[];
+  darts: Dart[];
   serverTime: number;
 }
 
@@ -260,6 +286,37 @@ export interface BrowserTokenReply {
   control: boolean;
 }
 
+export interface PongJoinPayload {
+  tableId: string;
+}
+export interface PongJoinReply {
+  side: 'a' | 'b';
+}
+
+export interface PongLeavePayload {
+  tableId: string;
+}
+
+export interface PongPaddlePayload {
+  tableId: string;
+  x: number;
+}
+
+export interface DartThrowPayload {
+  boardId: string;
+  u: number;
+  v: number;
+}
+
+export interface DartsClearPayload {
+  boardId: string;
+}
+
+export interface NotePayload {
+  propId: string;
+  midi: number;
+}
+
 export interface ClientEvents {
   move: { payload: MovePayload; reply: null };
   media_state: { payload: MediaStatePayload; reply: null };
@@ -279,6 +336,12 @@ export interface ClientEvents {
   alarm_pull: { payload: AlarmPullPayload; reply: null };
   prank: { payload: PrankPayload; reply: null };
   browser_token: { payload: BrowserTokenPayload; reply: BrowserTokenReply };
+  pong_join: { payload: PongJoinPayload; reply: PongJoinReply };
+  pong_leave: { payload: PongLeavePayload; reply: null };
+  pong_paddle: { payload: PongPaddlePayload; reply: null };
+  dart_throw: { payload: DartThrowPayload; reply: null };
+  darts_clear: { payload: DartsClearPayload; reply: null };
+  note: { payload: NotePayload; reply: null };
 }
 
 export interface BatchEvent {
@@ -339,6 +402,25 @@ export interface DeskUpdateEvent {
   by: string | null;
 }
 
+export interface PongStateEvent {
+  pong: PongState;
+}
+
+export interface DartEvent {
+  dart: Dart;
+  from: number[];
+}
+
+export interface DartsClearEvent {
+  boardId: string;
+}
+
+export interface NoteEvent {
+  id: string;
+  propId: string;
+  midi: number;
+}
+
 export interface ServerEvents {
   batch: BatchEvent;
   correction: CorrectionEvent;
@@ -353,9 +435,13 @@ export interface ServerEvents {
   scores: ScoresEvent;
   drill: DrillEvent;
   desk_update: DeskUpdateEvent;
+  pong_state: PongStateEvent;
+  dart: DartEvent;
+  darts_clear: DartsClearEvent;
+  note: NoteEvent;
 }
 
 export type ProtocolError = 'bad_payload' | 'unknown_event' | 'rate_limited' | 'busy' | 'not_owner' | 'too_far' | 'unknown_screen' | 'unknown_prop' | 'livekit_disabled' | 'cooldown';
 
-export const CLIENT_EVENTS = ["move","media_state","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","prop_use","toss","alarm_pull","prank","browser_token"] as const;
-export const SERVER_EVENTS = ["batch","correction","screen_update","chat","reaction","board_stroke","board_clear","sticker_update","prop_event","toss","scores","drill","desk_update"] as const;
+export const CLIENT_EVENTS = ["move","media_state","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","prop_use","toss","alarm_pull","prank","browser_token","pong_join","pong_leave","pong_paddle","dart_throw","darts_clear","note"] as const;
+export const SERVER_EVENTS = ["batch","correction","screen_update","chat","reaction","board_stroke","board_clear","sticker_update","prop_event","toss","scores","drill","desk_update","pong_state","dart","darts_clear","note"] as const;

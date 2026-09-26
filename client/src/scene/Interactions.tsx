@@ -6,6 +6,8 @@ import { getSeat, level, props, seats, zoneAt } from '../lib/level'
 import { openOverlay } from '../screens/actions'
 import { sit, standUp } from '../screens/seats'
 import { closePropOverlay, sameTarget, useGame, type Target } from '../store/game'
+import { useActivity } from '../store/activity'
+import { leaveActivity } from '../activities/games'
 import { local } from '../store/local'
 import { useScreens } from '../store/screens'
 
@@ -21,7 +23,7 @@ export function Interactions() {
     const offs = [
       onKey('KeyE', () => {
         const { target, menuOpen, seat, overlay } = useGame.getState()
-        if (overlay) return
+        if (overlay || useActivity.getState().mode) return
         if (!target) return
         if (target.kind === 'seat' && !seat) sit(target.seatId)
         else useGame.setState({ menuOpen: !menuOpen })
@@ -35,6 +37,7 @@ export function Interactions() {
         if (id && states[id]) openOverlay(id)
       }),
       onKey('Escape', () => {
+        if (useActivity.getState().mode) return leaveActivity()
         if (useGame.getState().overlay) return closePropOverlay()
         if (useScreens.getState().overlay) useScreens.setState({ overlay: null })
         else if (useGame.getState().menuOpen) useGame.setState({ menuOpen: false })

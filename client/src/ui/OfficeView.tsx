@@ -20,6 +20,11 @@ import { Jellos } from '../scene/Jellos'
 import { Scoreboard } from '../scene/Scoreboard'
 import { DrillFx } from '../scene/DrillFx'
 import { ActivityHud } from './ActivityHud'
+import { GameHud } from './GameHud'
+import { PongTables } from '../scene/PongTables'
+import { DartsBoards } from '../scene/DartsBoards'
+import { PianoKeys } from '../scene/PianoKeys'
+import '../activities/games'
 import { BrowserMenuItem, BrowserOverlay } from '../browser/BrowserUi'
 import { InteractionMenu, InteractionPrompt, ScreenOverlay } from './ScreenUi'
 import { IntranetMenuItem, PropMenu, PropOverlays, PropPrompt } from './PropUi'
@@ -75,6 +80,9 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
         <Jellos />
         <Scoreboard />
         <Tosses />
+        <PongTables />
+        <DartsBoards />
+        <PianoKeys />
         <DrillFx />
         <FxLayer />
         <RemotePlayers />
@@ -95,6 +103,7 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       />
       <PropMenu />
       <ActivityHud />
+      <GameHud />
       <PdfHint />
       <ScreenOverlay renderPdf={(id) => <PdfOverlay screenId={id} />} renderBrowser={(id) => <BrowserOverlay screenId={id} />} />
       <PropOverlays />

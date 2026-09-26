@@ -309,6 +309,63 @@ defmodule OfficeWeb.SpaceChannel do
     end
   end
 
+  defp handle_event("pong_join", %{"tableId" => id}, socket) do
+    with :ok <- near_prop(socket, id) do
+      case Space.pong_join(socket.assigns.space_id, socket.assigns.player_id, id) do
+        {:ok, side} -> {:reply, {:ok, %{side: side}}, socket}
+        {:error, reason} -> {:reply, error(reason), socket}
+      end
+    end
+  end
+
+  defp handle_event("pong_leave", %{"tableId" => id}, socket),
+    do: result(Space.pong_leave(socket.assigns.space_id, socket.assigns.player_id, id), socket)
+
+  defp handle_event("pong_paddle", %{"tableId" => id, "x" => x}, socket) do
+    Space.pong_paddle(socket.assigns.space_id, socket.assigns.player_id, id, x)
+    {:noreply, socket}
+  end
+
+  defp handle_event("dart_throw", %{"boardId" => id, "u" => u, "v" => v}, socket) do
+    now = now_ms()
+
+    with :ok <- near_prop(socket, id),
+         true <- (abs(u) <= 1.5 and abs(v) <= 1.5) || {:reply, error(:bad_payload), socket},
+         true <-
+           now - (socket.assigns[:last_dart] || now - 1_000) >= 700 ||
+             {:reply, error(:rate_limited), socket} do
+      {x, z} = position(socket)
+
+      :ok =
+        Space.dart_throw(socket.assigns.space_id, socket.assigns.player_id, id, u, v, [x, 1.6, z])
+
+      {:noreply, assign(socket, last_dart: now)}
+    end
+  end
+
+  defp handle_event("darts_clear", %{"boardId" => id}, socket) do
+    with :ok <- near_prop(socket, id),
+         do: result(Space.darts_clear(socket.assigns.space_id, id), socket)
+  end
+
+  # Piano: notes go straight to everyone (no state), with their own rate limit.
+  defp handle_event("note", %{"propId" => id, "midi" => midi}, socket) when midi in 36..96 do
+    with :ok <- near_prop(socket, id),
+         {:ok, bucket} <-
+           RateLimit.take(
+             socket.assigns[:note_bucket] || RateLimit.new(14, 24, now_ms()),
+             now_ms()
+           ) do
+      broadcast!(socket, "note", %{id: socket.assigns.player_id, propId: id, midi: midi})
+      {:noreply, assign(socket, note_bucket: bucket)}
+    else
+      {:error, bucket} -> {:noreply, assign(socket, note_bucket: bucket)}
+      reply -> reply
+    end
+  end
+
+  defp handle_event("note", _payload, socket), do: {:reply, error(:bad_payload), socket}
+
   defp handle_event("prank", %{"deskId" => desk_id}, socket) do
     with %{position: {dx, dz}} <-
            Level.get().desks[desk_id] || {:reply, error(:unknown_prop), socket},

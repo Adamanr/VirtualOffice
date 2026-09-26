@@ -113,6 +113,10 @@ for (const x of [8, 9.4, 10.8, 12.2, 13.6]) {
   for (const z of [-10.4, -9.2, -8, -6.8, -3.2, -2, -0.8, 0.4]) add('chair', x, z, FACE_E)
 }
 for (const [x, z] of [[5, -14], [5, 4], [19.3, -14.3], [19.3, 4.3]]) add('plant', x, z)
+// Games corner: ping-pong table, a dartboard with its throw line, and a piano on stage.
+add('pingpong_table', 6, -5.5, 0, { size: [1.525, 2.74] })
+add('dartboard', 4.12, -12, FACE_E, { elevation: 1.73 })
+add('piano', 19.45, -1.35, FACE_W, { base: 0.3, size: [1.5, 0.6] })
 clocks.push({ position: [4.12, 2.7, -8], rotationY: FACE_E, radius: 0.25 })
 
 // ── Break room ──────────────────────────────────────────────────────────────────────────────

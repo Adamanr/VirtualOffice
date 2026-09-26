@@ -60,7 +60,12 @@ defmodule Office.Scores do
     end
   end
 
-  @doc "A medal for a swish from three-point range."
+  @doc "Adds points (darts, …) to a player's total."
+  def add_points(scores, id, name, color, points) do
+    scores |> ensure(id, name, color) |> Map.update!(id, &%{&1 | points: &1.points + points})
+  end
+
+  @doc "A medal (three-pointer swish, bullseye, won ping-pong game)."
   def medal(scores, id), do: Map.update!(scores, id, &%{&1 | medals: &1.medals + 1})
 
   @doc "Top entries for the scoreboard."

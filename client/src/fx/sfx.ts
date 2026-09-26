@@ -5,7 +5,7 @@ import type { V3 } from './particles'
  * Synthesized sound effects (no audio assets). Positional in the simplest way:
  * volume falls off with distance from the local player, silent beyond ~18 m.
  */
-export type Sfx = 'ding' | 'swish' | 'bonk' | 'thud' | 'splat' | 'printer' | 'pop' | 'hiss' | 'clunk' | 'glug' | 'rim'
+export type Sfx = 'ding' | 'swish' | 'bonk' | 'thud' | 'splat' | 'printer' | 'pop' | 'hiss' | 'clunk' | 'glug' | 'rim' | 'tock' | 'thunk'
 
 let ctx: AudioContext | null = null
 let muted = false
@@ -107,6 +107,14 @@ export function play(name: Sfx, at?: V3) {
     case 'hiss':
       noise(c, out, t, 1.4, 0.35, 5000, 0.5)
       break
+    case 'tock':
+      tone(c, out, 'square', 1400, 900, t, 0.04, 0.5)
+      noise(c, out, t, 0.03, 0.4, 3000, 2)
+      break
+    case 'thunk':
+      tone(c, out, 'triangle', 260, 120, t, 0.09, 0.8)
+      noise(c, out, t, 0.05, 0.5, 1500, 1.5)
+      break
     case 'glug':
       for (let i = 0; i < 3; i++) tone(c, out, 'sine', 220 + i * 40, 160, t + i * 0.22, 0.18, 0.5)
       break
@@ -143,4 +151,37 @@ export function stopSiren() {
   siren.osc.stop()
   siren.lfo.stop()
   siren = null
+}
+
+/** A piano-ish note: a few decaying partials, volume by distance. */
+export function pianoNote(midi: number, at?: V3) {
+  const c = audio()
+  const vol = gainFor(at)
+  if (!c || vol <= 0) return
+  const f = 440 * 2 ** ((midi - 69) / 12)
+  const t = c.currentTime
+  const out = c.createGain()
+  out.gain.setValueAtTime(0.0001, t)
+  out.gain.exponentialRampToValueAtTime(0.3 * vol, t + 0.008)
+  out.gain.exponentialRampToValueAtTime(0.12 * vol, t + 0.25)
+  out.gain.exponentialRampToValueAtTime(0.0001, t + 1.8)
+  const lp = c.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.setValueAtTime(Math.min(9000, f * 8), t)
+  lp.frequency.exponentialRampToValueAtTime(Math.max(300, f * 2), t + 1.2)
+  lp.connect(out).connect(c.destination)
+  ;[
+    [1, 'triangle', 1],
+    [2, 'sine', 0.35],
+    [3, 'sine', 0.12],
+  ].forEach(([mult, type, g]) => {
+    const o = c.createOscillator()
+    const og = c.createGain()
+    o.type = type as OscillatorType
+    o.frequency.value = f * (mult as number)
+    og.gain.value = g as number
+    o.connect(og).connect(lp)
+    o.start(t)
+    o.stop(t + 1.9)
+  })
 }

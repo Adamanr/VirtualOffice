@@ -3,7 +3,9 @@ import { useRapier } from '@react-three/rapier'
 import { useEffect } from 'react'
 import * as THREE from 'three'
 import { onKey } from '../input/keyboard'
-import { getScreen, getSeat } from '../lib/level'
+import { getProp, getScreen, getSeat, propPoint } from '../lib/level'
+import { useActivity } from '../store/activity'
+import { activitySpot, OCHE, TABLE_TOP } from '../activities/spots'
 import { useGame } from '../store/game'
 import { cameraState, local } from '../store/local'
 import { playerBody } from './LocalPlayer'
@@ -78,6 +80,33 @@ export function CameraRig() {
     const dt = Math.min(rawDt, 0.05)
     const { cameraMode, seat } = useGame.getState()
     target.set(local.position.x, local.position.y + HEAD, local.position.z)
+
+    // Games: a fixed camera that shows what matters.
+    const mode = useActivity.getState().mode
+    const gameProp = mode ? getProp(mode.propId) : undefined
+    if (mode && gameProp) {
+      const spot = activitySpot(gameProp, mode.kind, mode.side)
+      const fx = Math.sin(spot.rotY)
+      const fz = Math.cos(spot.rotY)
+      if (mode.kind === 'pong') {
+        // High behind the player: over their head, the whole table and the paddle in view.
+        desired.set(spot.x - fx * 1.1 + fz * 0.45, 2.75, spot.z - fz * 1.1 - fx * 0.45)
+        lookAt.set(gameProp.x - fx * 0.2, TABLE_TOP, gameProp.z - fz * 0.2)
+      } else if (mode.kind === 'darts') {
+        // Close to the board so the sectors are readable; the throw still counts from the oche.
+        const [bx, , bz] = propPoint(gameProp, 0, 0, OCHE * 0.55)
+        desired.set(bx, gameProp.elevation + 0.1, bz)
+        lookAt.set(gameProp.x, gameProp.elevation, gameProp.z)
+      } else {
+        desired.set(spot.x - fx * 1.1, 2.05, spot.z - fz * 1.1)
+        const [kx, , kz] = propPoint(gameProp, 0, 0, 0.3)
+        lookAt.set(kx, 1.0, kz)
+      }
+      camera.position.lerp(desired, 1 - Math.exp(-dt * 6))
+      camera.up.copy(up)
+      camera.lookAt(lookAt)
+      return
+    }
 
     const seatInfo = getSeat(seat)
     const seatScreen = seatInfo?.screenId ? getScreen(seatInfo.screenId) : undefined

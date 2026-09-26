@@ -39,7 +39,7 @@ defmodule Office.Level do
   @type t :: %__MODULE__{}
 
   @key {__MODULE__, :level}
-  @interactive ~w(whiteboard bulletin_board vending_machine coffee_machine water_cooler microwave fridge copier fire_alarm)
+  @interactive ~w(whiteboard bulletin_board vending_machine coffee_machine water_cooler microwave fridge copier fire_alarm pingpong_table dartboard piano)
 
   @spec load!(Path.t()) :: t()
   def load!(path), do: path |> File.read!() |> Jason.decode!() |> from_map()

@@ -126,6 +126,28 @@
     "Jello": {
       "deskId": "string",
       "by": "string"
+    },
+    "PongState": {
+      "id": "string",
+      "a": "string | null",
+      "b": "string | null",
+      "pa": "number",
+      "pb": "number",
+      "ball": "number[]",
+      "sa": "number",
+      "sb": "number",
+      "status": "'idle' | 'point' | 'playing' | 'won'",
+      "winner": "string | null",
+      "t": "number"
+    },
+    "Dart": {
+      "id": "string",
+      "boardId": "string",
+      "by": "string",
+      "u": "number",
+      "v": "number",
+      "points": "number",
+      "ring": "string"
     }
   },
   "join": {
@@ -146,6 +168,8 @@
       "scores": "Score[]",
       "drill": "DrillState",
       "jellos": "Jello[]",
+      "pongs": "PongState[]",
+      "darts": "Dart[]",
       "serverTime": "number"
     },
     "errors": [
@@ -290,6 +314,48 @@
         "token": "string",
         "control": "boolean"
       }
+    },
+    "pong_join": {
+      "payload": {
+        "tableId": "string"
+      },
+      "reply": {
+        "side": "'a' | 'b'"
+      }
+    },
+    "pong_leave": {
+      "payload": {
+        "tableId": "string"
+      },
+      "reply": null
+    },
+    "pong_paddle": {
+      "payload": {
+        "tableId": "string",
+        "x": "number"
+      },
+      "reply": null
+    },
+    "dart_throw": {
+      "payload": {
+        "boardId": "string",
+        "u": "number",
+        "v": "number"
+      },
+      "reply": null
+    },
+    "darts_clear": {
+      "payload": {
+        "boardId": "string"
+      },
+      "reply": null
+    },
+    "note": {
+      "payload": {
+        "propId": "string",
+        "midi": "integer"
+      },
+      "reply": null
     }
   },
   "server": {
@@ -337,6 +403,21 @@
       "deskId": "string",
       "jello": "boolean",
       "by": "string | null"
+    },
+    "pong_state": {
+      "pong": "PongState"
+    },
+    "dart": {
+      "dart": "Dart",
+      "from": "number[]"
+    },
+    "darts_clear": {
+      "boardId": "string"
+    },
+    "note": {
+      "id": "string",
+      "propId": "string",
+      "midi": "number"
     }
   },
   "errors": [

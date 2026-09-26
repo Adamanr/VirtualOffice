@@ -17,6 +17,7 @@ import { closePropOverlay, notify, openPropOverlay, useGame } from '../store/gam
 import { usePlayers } from '../store/players'
 import { useProps } from '../store/props'
 import { useActivity } from '../store/activity'
+import { collectDarts, enterDarts, joinPong, sitAtPiano } from '../activities/games'
 import { useScreens } from '../store/screens'
 import { clock } from '../net/remotes'
 import type { BoardStroke, Sticker } from '@shared/protocol.gen'
@@ -86,11 +87,47 @@ export function PropMenu() {
           {prop.kind === 'copier' && '🖨️ Напечатать'}
         </button>
       )}
+      {prop.kind === 'pingpong_table' && <PongItems tableId={prop.id} />}
+      {prop.kind === 'dartboard' && (
+        <>
+          <button className="btn" onClick={() => enterDarts(prop.id)}>
+            🎯 Встать к линии и бросать
+          </button>
+          <button className="btn" onClick={() => collectDarts(prop.id)}>
+            🧺 Собрать дротики с мишени
+          </button>
+        </>
+      )}
+      {prop.kind === 'piano' && (
+        <button className="btn" onClick={() => sitAtPiano(prop.id)}>
+          🎹 Сесть за пианино
+        </button>
+      )}
       {prop.kind === 'fire_alarm' && <AlarmItems propId={prop.id} drillActive={!!drill?.active} cooldownUntil={drill?.cooldownUntil ?? 0} />}
       <button className="btn ghost small" onClick={() => useGame.setState({ menuOpen: false })}>
         Закрыть
       </button>
     </div>
+  )
+}
+
+function PongItems({ tableId }: { tableId: string }) {
+  const state = useActivity((s) => s.pongs[tableId])
+  const players = usePlayers((s) => s.players)
+  const humans = [state?.a, state?.b].filter((x) => x && x !== 'bot') as string[]
+  return (
+    <>
+      <div className="muted small">
+        {humans.length === 0
+          ? 'Стол свободен. Один — сыграете с Дуайт-ботом, вдвоём — друг с другом.'
+          : humans.length === 1
+            ? `Играет ${players[humans[0]!]?.name ?? '…'} против бота — займите его место!`
+            : 'Стол занят — можно смотреть'}
+      </div>
+      <button className="btn" disabled={humans.length >= 2} onClick={() => void joinPong(tableId)}>
+        🏓 {humans.length === 1 ? 'Бросить вызов' : 'Играть'}
+      </button>
+    </>
   )
 }
 

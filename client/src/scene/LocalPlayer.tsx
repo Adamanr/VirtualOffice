@@ -9,6 +9,7 @@ import { getSeat, level } from '../lib/level'
 import { cameraState, local } from '../store/local'
 import { useGame } from '../store/game'
 import { usePlayers } from '../store/players'
+import { useActivity } from '../store/activity'
 import { Avatar } from './Avatar'
 
 const WALK_SPEED = 3
@@ -53,7 +54,9 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
     if (!rb || !kcc) return
     const dt = Math.min(rawDt, 0.05)
     const collider = rb.collider(0)
-    const seated = useGame.getState().seat !== null
+    const game = useActivity.getState().mode
+    // Sitting, or standing at a game: the player stays put.
+    const seated = useGame.getState().seat !== null || game !== null
 
     if (local.teleport) {
       const t = local.teleport
@@ -94,7 +97,7 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
       local.anim = moving && actuallyMoving ? (run ? Anim.run : Anim.walk) : Anim.idle
     }
 
-    if (seated) local.anim = Anim.sit
+    if (seated) local.anim = game && game.kind !== 'piano' ? Anim.idle : Anim.sit
     const v = visual.current
     if (v) {
       v.position.copy(local.position)

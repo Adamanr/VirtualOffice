@@ -260,4 +260,54 @@ defmodule OfficeWeb.SpaceChannelTest do
     ref = push(c, "browser_token", %{"screenId" => "desk_01_monitor"})
     assert_reply ref, :error, %{reason: "too_far"}
   end
+
+  defp prop_of(type) do
+    Enum.find(Office.Level.get().props, fn {_, p} -> p.type == type end)
+  end
+
+  test "ping-pong: alone you play the bot, the rally is broadcast to the whole space" do
+    s = space()
+    {_, a} = join_as(s, "player-aaaa")
+    {_, _watcher} = join_as(s, "player-wwww")
+    {table, %{position: {tx, tz}}} = prop_of("pingpong_table")
+    push(a, "move", %{"s" => [tx, 0, tz - 1.9, 0, 0]})
+    Process.sleep(20)
+    ref = push(a, "pong_join", %{"tableId" => table})
+    assert_reply ref, :ok, %{side: "a"}
+    assert_broadcast "pong_state", %{pong: %{a: "player-aaaa", b: "bot", status: "point"}}, 500
+    push(a, "pong_paddle", %{"tableId" => table, "x" => 0.3})
+    assert_broadcast "pong_state", %{pong: %{status: "playing", pa: 0.3}}, 2500
+  end
+
+  test "darts stick for everyone and score" do
+    s = space()
+    {_, a} = join_as(s, "player-aaaa")
+    {board, %{position: {bx, bz}}} = prop_of("dartboard")
+    push(a, "move", %{"s" => [bx + 2.3, 0, bz, 0, 0]})
+    Process.sleep(20)
+    push(a, "dart_throw", %{"boardId" => board, "u" => 0.0, "v" => 0.0})
+
+    assert_broadcast "dart",
+                     %{
+                       dart: %{boardId: ^board, by: "player-aaaa", points: points},
+                       from: [_, _, _]
+                     },
+                     500
+
+    assert points > 0
+    assert_broadcast "scores", %{scores: [%{id: "player-aaaa"}]}, 500
+    {%{darts: [_]}, _} = join_as(s, "player-late")
+  end
+
+  test "piano notes reach everyone; out-of-range notes are refused" do
+    s = space()
+    {_, a} = join_as(s, "player-aaaa")
+    {piano, %{position: {px, pz}}} = prop_of("piano")
+    push(a, "move", %{"s" => [px - 1.0, 0.3, pz, 0, 0]})
+    Process.sleep(20)
+    push(a, "note", %{"propId" => piano, "midi" => 60})
+    assert_broadcast "note", %{id: "player-aaaa", midi: 60}, 500
+    ref = push(a, "note", %{"propId" => piano, "midi" => 200})
+    assert_reply ref, :error, %{reason: "bad_payload"}
+  end
 end

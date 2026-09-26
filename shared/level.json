@@ -1171,6 +1171,25 @@
    "rotationY": 0
   },
   {
+   "type": "pingpong_table",
+   "position": [6, -5.5],
+   "rotationY": 0,
+   "size": [1.525, 2.74]
+  },
+  {
+   "type": "dartboard",
+   "position": [4.12, -12],
+   "rotationY": 1.571,
+   "elevation": 1.73
+  },
+  {
+   "type": "piano",
+   "position": [19.45, -1.35],
+   "rotationY": -1.571,
+   "base": 0.3,
+   "size": [1.5, 0.6]
+  },
+  {
    "type": "counter",
    "position": [12, 14.45],
    "rotationY": 0,

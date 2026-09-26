@@ -8,7 +8,7 @@ defmodule Office.Space do
 
   use GenServer, restart: :transient
 
-  alias Office.{Chat, Drill, Level, Props, Scores, Screens, Toss}
+  alias Office.{Chat, Darts, Drill, Level, Pong, Props, Scores, Screens, Toss}
 
   @tick_ms 66
   @idle_shutdown_ms 60_000
@@ -66,6 +66,20 @@ defmodule Office.Space do
 
   def prank(space_id, player_id, desk_id), do: call(space_id, {:prank, player_id, desk_id})
 
+  def pong_join(space_id, player_id, table_id),
+    do: call(space_id, {:pong_join, player_id, table_id})
+
+  def pong_leave(space_id, player_id, table_id),
+    do: call(space_id, {:pong_leave, player_id, table_id})
+
+  def pong_paddle(space_id, player_id, table_id, x),
+    do: GenServer.cast(via(space_id), {:pong_paddle, player_id, table_id, x})
+
+  def dart_throw(space_id, player_id, board_id, u, v, from),
+    do: call(space_id, {:dart_throw, player_id, board_id, u, v, from})
+
+  def darts_clear(space_id, board_id), do: call(space_id, {:darts_clear, board_id})
+
   # Starts the space on demand; retries once if it was just shutting down.
   defp call(space_id, msg, retry \\ true) do
     ensure_started(space_id)
@@ -97,6 +111,9 @@ defmodule Office.Space do
        props: Props.new(level),
        scores: Scores.new(),
        drill: Drill.new(),
+       pongs:
+         for({id, %{type: "pingpong_table"}} <- level.props, into: %{}, do: {id, Pong.new(id)}),
+       darts: %{},
        chat: Chat.new(),
        idle_timer: schedule_idle(nil)
      }}
@@ -275,6 +292,44 @@ defmodule Office.Space do
     end
   end
 
+  def handle_call({:pong_join, player_id, table_id}, _from, state) do
+    with %{} = pong <- state.pongs[table_id],
+         {:ok, pong, side} <- Pong.join(pong, player_id, now()) do
+      broadcast(state, "pong_state", %{pong: Pong.to_wire(pong)})
+      {:reply, {:ok, side}, put_in(state.pongs[table_id], pong)}
+    else
+      nil -> {:reply, {:error, :unknown_prop}, state}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:pong_leave, player_id, table_id}, _from, state) do
+    case state.pongs[table_id] do
+      nil ->
+        {:reply, {:error, :unknown_prop}, state}
+
+      pong ->
+        pong = Pong.leave(pong, player_id, now())
+        broadcast(state, "pong_state", %{pong: Pong.to_wire(pong)})
+        {:reply, :ok, put_in(state.pongs[table_id], pong)}
+    end
+  end
+
+  def handle_call({:dart_throw, player_id, board_id, u, v, from}, _from, state) do
+    thrower = Map.fetch!(state.players, player_id)
+    {darts, dart} = Darts.throw(Map.get(state.darts, board_id, []), board_id, player_id, u, v)
+    broadcast(state, "dart", %{dart: dart, from: from})
+    scores = Scores.add_points(state.scores, player_id, thrower.name, thrower.color, dart.points)
+    scores = if dart.ring == "bull", do: Scores.medal(scores, player_id), else: scores
+    broadcast(state, "scores", %{scores: Scores.top(scores)})
+    {:reply, :ok, %{state | darts: Map.put(state.darts, board_id, darts), scores: scores}}
+  end
+
+  def handle_call({:darts_clear, board_id}, _from, state) do
+    broadcast(state, "darts_clear", %{boardId: board_id})
+    {:reply, :ok, %{state | darts: Map.put(state.darts, board_id, [])}}
+  end
+
   def handle_call({:prank, player_id, desk_id}, _from, state) do
     case Props.toggle_jello(state.props, state.level, desk_id, player_id) do
       {:ok, props, jello?} ->
@@ -292,6 +347,13 @@ defmodule Office.Space do
   end
 
   @impl true
+  def handle_cast({:pong_paddle, player_id, table_id, x}, state) do
+    case state.pongs[table_id] do
+      nil -> {:noreply, state}
+      pong -> {:noreply, put_in(state.pongs[table_id], Pong.set_paddle(pong, player_id, x))}
+    end
+  end
+
   def handle_cast({:move, player_id, player_state}, state) do
     case Map.fetch(state.players, player_id) do
       {:ok, p} ->
@@ -304,7 +366,7 @@ defmodule Office.Space do
 
   @impl true
   def handle_info(:tick, state) do
-    state = tick_drill(state)
+    state = state |> tick_drill() |> tick_pongs()
 
     dirty =
       for {id, %{dirty: true, state: {x, y, z, r, a}}} <- state.players, do: [id, x, y, z, r, a]
@@ -322,6 +384,19 @@ defmodule Office.Space do
     case Enum.find(state.players, fn {_, p} -> p.ref == ref end) do
       {player_id, _} ->
         {screens, freed} = Screens.release_all(state.screens, player_id)
+
+        pongs =
+          Map.new(state.pongs, fn {id, pong} ->
+            if player_id in [pong.a, pong.b] do
+              pong = Pong.leave(pong, player_id, now())
+              broadcast(state, "pong_state", %{pong: Pong.to_wire(pong)})
+              {id, pong}
+            else
+              {id, pong}
+            end
+          end)
+
+        state = %{state | pongs: pongs}
         Enum.each(freed, &broadcast(state, "screen_update", %{screen: &1}))
         players = Map.delete(state.players, player_id)
         idle = if players == %{}, do: schedule_idle(state.idle_timer), else: state.idle_timer
@@ -334,6 +409,36 @@ defmodule Office.Space do
 
   def handle_info(:idle_shutdown, state) do
     if state.players == %{}, do: {:stop, :normal, state}, else: {:noreply, state}
+  end
+
+  defp tick_pongs(state) do
+    now = now()
+
+    Enum.reduce(state.pongs, state, fn
+      {_id, %{status: "idle"}}, acc ->
+        acc
+
+      {id, pong}, acc ->
+        next = Pong.step(pong, @tick_ms / 1000, now)
+        broadcast(acc, "pong_state", %{pong: Pong.to_wire(next)})
+        acc = put_in(acc.pongs[id], next)
+
+        # A finished game: the (human) winner gets a medal on the Office Olympics board.
+        if pong.status != "won" and next.status == "won" and next.winner not in [nil, "bot"] do
+          %{name: name, color: color} =
+            Map.get(acc.players, next.winner, %{name: "?", color: "#888888"})
+
+          scores =
+            acc.scores
+            |> Scores.add_points(next.winner, name, color, 0)
+            |> Scores.medal(next.winner)
+
+          broadcast(acc, "scores", %{scores: Scores.top(scores)})
+          %{acc | scores: scores}
+        else
+          acc
+        end
+    end)
   end
 
   defp tick_drill(%{drill: %{active: false}} = state), do: state
@@ -383,6 +488,8 @@ defmodule Office.Space do
       props: props_snap.props,
       jellos: props_snap.jellos,
       scores: Scores.top(state.scores),
+      pongs: state.pongs |> Map.values() |> Enum.map(&Pong.to_wire/1),
+      darts: state.darts |> Map.values() |> List.flatten(),
       drill: state.drill
     }
   end

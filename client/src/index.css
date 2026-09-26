@@ -194,3 +194,16 @@ kbd { font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12); bo
 .browser-status { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--panel-solid); border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; font-size: 13px; }
 .browser-open { width: 100%; }
 .browser-open .input { flex: 1; }
+
+/* Games */
+.pong-score { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; background: rgba(15,18,25,0.85); color: #fff; padding: 6px 12px; border-radius: 10px; font-size: 13px; white-space: nowrap; border: 1px solid rgba(255,255,255,0.15); }
+.pong-score strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.pong-win { flex-basis: 100%; text-align: center; color: #ffd84a; font-weight: 700; }
+.dart-score { font: 800 18px system-ui, sans-serif; color: #ffd84a; text-shadow: 0 2px 4px #000; animation: pop 0.3s ease-out; white-space: nowrap; }
+.game-hud { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 26; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; align-items: center; font-size: 13px; }
+.game-hud .row { gap: 8px; }
+.piano-keys { position: relative; display: flex; height: 110px; user-select: none; touch-action: none; }
+.piano-white { width: 34px; height: 110px; background: #fbfaf5; border: 1px solid #333; border-radius: 0 0 5px 5px; display: flex; align-items: flex-end; justify-content: center; font: 11px ui-monospace, monospace; color: #666; padding-bottom: 4px; cursor: pointer; }
+.piano-white.down { background: #ffd84a; }
+.piano-black { position: absolute; top: 0; width: 22px; height: 68px; background: #1d2026; border-radius: 0 0 4px 4px; z-index: 2; display: flex; align-items: flex-end; justify-content: center; font: 10px ui-monospace, monospace; color: #aaa; padding-bottom: 3px; cursor: pointer; }
+.piano-black.down { background: #f5a524; }

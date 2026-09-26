@@ -5,7 +5,7 @@ import * as THREE from 'three'
  * Plain mutable arrays stepped once per frame by <FxLayer/>; every kind is a
  * single InstancedMesh, and nothing is drawn when a kind has no live particles.
  */
-export type ParticleKind = 'puff' | 'paper' | 'popcorn' | 'jelly' | 'spark' | 'star' | 'stink' | 'confetti' | 'bubble' | 'dust'
+export type ParticleKind = 'puff' | 'paper' | 'popcorn' | 'jelly' | 'spark' | 'star' | 'stink' | 'confetti' | 'bubble' | 'dust' | 'note'
 export type V3 = [number, number, number]
 
 export interface Particle {
@@ -51,6 +51,7 @@ const DEFAULTS: Record<ParticleKind, Required<Omit<BurstOptions, 'dir' | 'colors
   confetti: { spread: 2.2, up: 3.2, life: 3, size: 0.06, grow: 0, gravity: -5, drag: 1.4, jitter: 0.1 },
   bubble: { spread: 0.03, up: 0.5, life: 0.9, size: 0.035, grow: 0.02, gravity: 0.4, drag: 0, jitter: 0.08 },
   dust: { spread: 1.2, up: 0.6, life: 1.2, size: 0.12, grow: 0.3, gravity: -0.5, drag: 2, jitter: 0.25 },
+  note: { spread: 0.25, up: 0.7, life: 2.2, size: 0.22, grow: 0, gravity: 0.1, drag: 0.4, jitter: 0.15 },
 }
 
 const MAX = 900

@@ -17,12 +17,28 @@ const KINDS: { kind: ParticleKind; geometry: THREE.BufferGeometry; material: THR
 ]
 const MAX_PER_KIND = 400
 
+// A ♪ sprite for piano notes (billboarded, tinted per note).
+function noteMaterial() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  g.fillStyle = '#ffffff'
+  g.font = '700 110px serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText('♪', 64, 70)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: THREE.DoubleSide })
+}
+KINDS.push({ kind: 'note', geometry: new THREE.PlaneGeometry(1, 1), material: noteMaterial() })
+
 /** Draws every live particle; steps the simulation once per frame. */
 export function FxLayer() {
   const refs = useRef<Record<string, THREE.InstancedMesh | null>>({})
   const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), s: new THREE.Vector3(), white: new THREE.Color('#ffffff') }), [])
 
-  useFrame((_, rawDt) => {
+  useFrame(({ camera }, rawDt) => {
     stepParticles(Math.min(rawDt, 0.05))
     const counts: Record<string, number> = {}
     for (const p of particles) {
@@ -34,11 +50,13 @@ export function FxLayer() {
       // Fade out by shrinking over the last 30% of life.
       const k = p.life / p.maxLife
       const fade = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1
-      tmp.q.setFromEuler(p.rot)
+      // Notes face the camera; everything else tumbles.
+      if (p.kind === 'note') tmp.q.copy(camera.quaternion)
+      else tmp.q.setFromEuler(p.rot)
       tmp.s.setScalar(p.size * fade)
       tmp.m.compose(p.p, tmp.q, tmp.s)
       mesh.setMatrixAt(i, tmp.m)
-      if (p.kind === 'confetti') mesh.setColorAt(i, p.color ?? tmp.white)
+      if (p.kind === 'confetti' || p.kind === 'note') mesh.setColorAt(i, p.color ?? tmp.white)
     }
     for (const { kind } of KINDS) {
       const mesh = refs.current[kind]

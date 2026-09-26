@@ -25,6 +25,8 @@ export class BrowserSession {
     this.info = { t: 'info', url: startUrl, title: '', loading: true, fullscreen: false }
     this.mouse = { buttons: 0 }
     this.closed = false
+    this.hq = null
+    this.inputScale = 1
     this.idleTimer = null
     this.cursor = { x: VIEWPORT.width / 2, y: VIEWPORT.height / 2 }
     this.lastCursorSent = 0
@@ -40,7 +42,6 @@ export class BrowserSession {
     this.log('session', this.screenId, this.sink ? `audio via ${this.sink.name}` : 'no audio')
     this.context = await this.browser.createBrowserContext()
     const page = (this.page = await this.context.newPage())
-    await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 })
     const cdp = (this.cdp = await page.createCDPSession())
     await cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' }).catch(() => {})
     cdp.on('Page.screencastFrame', ({ data, sessionId }) => {
@@ -48,11 +49,14 @@ export class BrowserSession {
       this.lastFrame = tagged(FRAME, Buffer.from(data, 'base64'))
       this.broadcast(this.lastFrame)
     })
-    await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 62, maxWidth: VIEWPORT.width, maxHeight: VIEWPORT.height, everyNthFrame: 1 })
+    await this.applyQuality(false)
 
     page.on('dialog', (d) => d.dismiss().catch(() => {}))
     // Tell viewers when the page goes fullscreen (e.g. a video's ⛶ button), even inside iframes.
-    await page.exposeFunction('__officeFullscreen', (on) => this.setInfo({ fullscreen: !!on })).catch(() => {})
+    await page.exposeFunction('__officeFullscreen', (on) => {
+      this.setInfo({ fullscreen: !!on })
+      void this.applyQuality(!!on)
+    }).catch(() => {})
     await page.evaluateOnNewDocument(() => {
       document.addEventListener('fullscreenchange', () => window.__officeFullscreen?.(!!document.fullscreenElement), true)
     })
@@ -67,6 +71,36 @@ export class BrowserSession {
     })
     page.on('load', async () => this.setInfo({ title: await page.title().catch(() => ''), loading: false }))
     await this.navigate(this.startUrl)
+  }
+
+  /**
+   * Page size and the "monitor" it believes it's on. The screen must match the
+   * viewport, or fullscreen players size themselves to headless Chromium's
+   * default 800×600 screen and sit off-center. While the page is fullscreen
+   * (a video) the tab becomes 1920×1200 (screencast ignores deviceScaleFactor,
+   * so we grow the page itself) and frames get sharper. Viewers keep sending
+   * 1280×800 coordinates; `inputScale` maps them.
+   */
+  async applyQuality(hq) {
+    if (this.hq === hq || this.closed) return
+    this.hq = hq
+    const scale = hq ? 1.5 : 1
+    const width = Math.round(VIEWPORT.width * scale)
+    const height = Math.round(VIEWPORT.height * scale)
+    this.inputScale = scale
+    await this.cdp
+      .send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false, screenWidth: width, screenHeight: height })
+      .catch(() => {})
+    await this.cdp.send('Page.stopScreencast').catch(() => {})
+    await this.cdp
+      .send('Page.startScreencast', {
+        format: 'jpeg',
+        quality: hq ? 82 : 72,
+        maxWidth: width,
+        maxHeight: height,
+        everyNthFrame: 1,
+      })
+      .catch(() => {})
   }
 
   setInfo(patch) {
@@ -119,7 +153,9 @@ export class BrowserSession {
             this.send({ t: 'cursor', ...this.cursor })
           }
         }
-        await this.cdp.send(cmd.method, cmd.params).catch(() => {})
+        // Viewers speak 1280×800; the page may be bigger while fullscreen.
+        const params = 'x' in cmd.params ? { ...cmd.params, x: cmd.params.x * this.inputScale, y: cmd.params.y * this.inputScale } : cmd.params
+        await this.cdp.send(cmd.method, params).catch(() => {})
       }
     }
   }

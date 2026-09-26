@@ -29,6 +29,8 @@ function launch({ env }) {
     executablePath: CHROMIUM,
     headless: true,
     env,
+    // We set the page size ourselves (see BrowserSession.applyQuality).
+    defaultViewport: null,
     // Puppeteer mutes headless Chromium by default; we capture the tab's sound.
     ignoreDefaultArgs: ['--mute-audio'],
     args: [
@@ -43,6 +45,7 @@ function launch({ env }) {
       '--disable-sync',
       '--no-first-run',
       '--lang=ru-RU,ru,en',
+      `--window-size=${1280},${800}`,
     ],
   })
 }

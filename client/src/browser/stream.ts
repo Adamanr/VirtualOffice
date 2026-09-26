@@ -40,6 +40,8 @@ class BrowserStream {
   /** The presenter's cursor on the page (page pixels), for everyone. */
   readonly cursor = { x: VIEWPORT.width / 2, y: VIEWPORT.height / 2 }
   private audioOn = true
+  /** Bumped when the frame size changes (textures must be re-created). */
+  resized = 0
 
   constructor(screenId: string) {
     this.screenId = screenId
@@ -151,7 +153,13 @@ class BrowserStream {
     this.decoding = true
     createImageBitmap(blob)
       .then((bmp) => {
-        this.canvas.getContext('2d')!.drawImage(bmp, 0, 0, this.canvas.width, this.canvas.height)
+        // Keep the frame's real resolution (1.5× while a video is fullscreen).
+        if (bmp.width !== this.canvas.width || bmp.height !== this.canvas.height) {
+          this.canvas.width = bmp.width
+          this.canvas.height = bmp.height
+          this.resized++
+        }
+        this.canvas.getContext('2d')!.drawImage(bmp, 0, 0)
         bmp.close()
         this.listeners.forEach((l) => l())
         this.patch({ status: 'live' })

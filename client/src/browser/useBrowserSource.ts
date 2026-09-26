@@ -19,7 +19,13 @@ export function useBrowserSource(screenId: string, enabled: boolean): ScreenSour
   useEffect(() => {
     if (!enabled) return
     stream.acquire()
+    let size = stream.resized
     const off = stream.onFrame(() => {
+      // A new frame size needs a new GPU texture (three.js allocates it immutably).
+      if (stream.resized !== size) {
+        size = stream.resized
+        texture.dispose()
+      }
       texture.needsUpdate = true
       setLive(true)
     })

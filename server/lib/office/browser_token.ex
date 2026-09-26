@@ -33,6 +33,7 @@ defmodule Office.BrowserToken do
       |> Jason.OrderedObject.new()
       |> Jason.encode!()
       |> Base.url_encode64(padding: false)
+
     mac = :crypto.mac(:hmac, :sha256, secret, body) |> Base.url_encode64(padding: false)
     body <> "." <> mac
   end

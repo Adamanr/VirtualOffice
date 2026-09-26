@@ -366,6 +366,43 @@ defmodule OfficeWeb.SpaceChannel do
 
   defp handle_event("note", _payload, socket), do: {:reply, error(:bad_payload), socket}
 
+  defp handle_event("annot_stroke", %{"screenId" => id} = payload, socket),
+    do: annotate(socket, id, :add, payload)
+
+  defp handle_event("annot_undo", %{"screenId" => id}, socket),
+    do: annotate(socket, id, :undo, nil)
+
+  defp handle_event("annot_clear", %{"screenId" => id, "all" => all}, socket),
+    do: annotate(socket, id, :clear, all)
+
+  defp handle_event(
+         "annot_settings",
+         %{"screenId" => id, "locked" => locked, "spotlight" => spot, "ctx" => ctx},
+         socket
+       ),
+       do: annotate(socket, id, :settings, {locked, spot, ctx})
+
+  # The laser pointer: ~20 updates/s, its own budget, no reply.
+  defp handle_event("annot_laser", %{"screenId" => id, "x" => x, "y" => y}, socket) do
+    case RateLimit.take(
+           socket.assigns[:laser_bucket] || RateLimit.new(25, 40, now_ms()),
+           now_ms()
+         ) do
+      {:ok, bucket} ->
+        x = x |> max(0) |> min(1)
+        y = y |> max(0) |> min(1)
+        socket = assign(socket, laser_bucket: bucket)
+
+        case annotate(socket, id, :laser, {x, y}) do
+          {:reply, _error, socket} -> {:noreply, socket}
+          other -> other
+        end
+
+      {:error, bucket} ->
+        {:noreply, assign(socket, laser_bucket: bucket)}
+    end
+  end
+
   defp handle_event("prank", %{"deskId" => desk_id}, socket) do
     with %{position: {dx, dz}} <-
            Level.get().desks[desk_id] || {:reply, error(:unknown_prop), socket},
@@ -389,6 +426,23 @@ defmodule OfficeWeb.SpaceChannel do
   end
 
   # --- helpers
+
+  # Only people who can see a screen draw on it.
+  defp annotate(socket, screen_id, op, arg) do
+    %{space_id: space_id, player_id: me, zone: zone} = socket.assigns
+
+    case Level.screen(Level.get(), screen_id) do
+      nil ->
+        {:reply, error(:unknown_screen), socket}
+
+      screen ->
+        if Screens.can_see?(screen, zone, position(socket)) do
+          result(Space.annotate(space_id, me, screen_id, op, arg), socket)
+        else
+          {:reply, error(:too_far), socket}
+        end
+    end
+  end
 
   defp claim_screen(socket, screen_id, mode, url) do
     %{space_id: space_id, player_id: me} = socket.assigns

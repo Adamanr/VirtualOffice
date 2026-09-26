@@ -8,7 +8,7 @@ defmodule Office.Space do
 
   use GenServer, restart: :transient
 
-  alias Office.{Chat, Darts, Drill, Level, Pong, Props, Scores, Screens, Toss}
+  alias Office.{Annotations, Chat, Darts, Drill, Level, Pong, Props, Scores, Screens, Toss}
 
   @tick_ms 66
   @idle_shutdown_ms 60_000
@@ -80,6 +80,10 @@ defmodule Office.Space do
 
   def darts_clear(space_id, board_id), do: call(space_id, {:darts_clear, board_id})
 
+  @doc "Drawing on a shared screen: op is :add | :undo | :clear | :settings | :laser."
+  def annotate(space_id, player_id, screen_id, op, arg),
+    do: call(space_id, {:annotate, player_id, screen_id, op, arg})
+
   # Starts the space on demand; retries once if it was just shutting down.
   defp call(space_id, msg, retry \\ true) do
     ensure_started(space_id)
@@ -114,6 +118,7 @@ defmodule Office.Space do
        pongs:
          for({id, %{type: "pingpong_table"}} <- level.props, into: %{}, do: {id, Pong.new(id)}),
        darts: %{},
+       annots: Annotations.new(),
        chat: Chat.new(),
        idle_timer: schedule_idle(nil)
      }}
@@ -167,6 +172,7 @@ defmodule Office.Space do
       {:ok, screens, changed} ->
         changed = List.wrap(changed)
         Office.BrowserControl.close_ended(state.screens, changed)
+        state = reset_annotations(state, changed)
         Enum.each(changed, &broadcast(state, "screen_update", %{screen: &1}))
         reply = Enum.find(changed, &(&1.id == screen_id))
         {:reply, {:ok, reply}, %{state | screens: screens}}
@@ -326,6 +332,26 @@ defmodule Office.Space do
     {:reply, :ok, %{state | darts: Map.put(state.darts, board_id, darts), scores: scores}}
   end
 
+  def handle_call({:annotate, player_id, screen_id, op, arg}, _from, state) do
+    owner = get_in(state.screens, [screen_id, :owner])
+    presenter? = owner == player_id
+    a = state.annots
+
+    cond do
+      owner == nil ->
+        {:reply, {:error, :unknown_screen}, state}
+
+      op in [:add, :laser] and not presenter? and Annotations.locked?(a, screen_id) ->
+        {:reply, {:error, :locked}, state}
+
+      op == :settings and not presenter? ->
+        {:reply, {:error, :not_owner}, state}
+
+      true ->
+        annotate(state, player_id, screen_id, op, arg, presenter?)
+    end
+  end
+
   def handle_call({:darts_clear, board_id}, _from, state) do
     broadcast(state, "darts_clear", %{boardId: board_id})
     {:reply, :ok, %{state | darts: Map.put(state.darts, board_id, [])}}
@@ -387,6 +413,7 @@ defmodule Office.Space do
         {screens, freed} = Screens.release_all(state.screens, player_id)
         # The owner left the office: their shared-browser tabs end too.
         Office.BrowserControl.close_ended(state.screens, freed)
+        state = reset_annotations(state, freed)
 
         pongs =
           Map.new(state.pongs, fn {id, pong} ->
@@ -412,6 +439,65 @@ defmodule Office.Space do
 
   def handle_info(:idle_shutdown, state) do
     if state.players == %{}, do: {:stop, :normal, state}, else: {:noreply, state}
+  end
+
+  defp annotate(state, player_id, screen_id, op, arg, presenter?) do
+    a = state.annots
+
+    case op do
+      :add ->
+        case Annotations.add(a, screen_id, player_id, arg) do
+          {:ok, a, stroke} ->
+            broadcast(state, "annot_stroke", %{stroke: stroke})
+            {:reply, :ok, %{state | annots: a}}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
+
+      :undo ->
+        {a, ids} = Annotations.undo(a, screen_id, player_id)
+        if ids != [], do: broadcast(state, "annot_remove", %{screenId: screen_id, ids: ids})
+        {:reply, :ok, %{state | annots: a}}
+
+      :clear ->
+        {a, ids} = Annotations.clear(a, screen_id, player_id, arg and presenter?)
+        if ids != [], do: broadcast(state, "annot_remove", %{screenId: screen_id, ids: ids})
+        {:reply, :ok, %{state | annots: a}}
+
+      :settings ->
+        {locked, spotlight, ctx} = arg
+
+        case Annotations.set(a, screen_id, locked, spotlight, ctx) do
+          {:ok, a, settings} ->
+            broadcast(state, "annot_settings", %{settings: settings})
+            {:reply, :ok, %{state | annots: a}}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
+
+      :laser ->
+        {x, y} = arg
+        broadcast(state, "annot_laser", %{screenId: screen_id, id: player_id, x: x, y: y})
+        {:reply, :ok, state}
+    end
+  end
+
+  # New presenter / released screen: its drawings belonged to the old content.
+  defp reset_annotations(state, changed) do
+    Enum.reduce(changed, state, fn %{id: id, owner: owner, mode: mode}, acc ->
+      old = Map.get(acc.screens, id, %{})
+
+      if owner != old[:owner] or mode != old[:mode] or owner == nil do
+        {annots, ids} = Annotations.reset(acc.annots, id)
+        if ids != [], do: broadcast(acc, "annot_remove", %{screenId: id, ids: ids})
+        broadcast(acc, "annot_settings", %{settings: Annotations.default_settings(id)})
+        %{acc | annots: annots}
+      else
+        acc
+      end
+    end)
   end
 
   defp tick_pongs(state) do
@@ -493,6 +579,8 @@ defmodule Office.Space do
       scores: Scores.top(state.scores),
       pongs: state.pongs |> Map.values() |> Enum.map(&Pong.to_wire/1),
       darts: state.darts |> Map.values() |> List.flatten(),
+      annotations: Annotations.snapshot(state.annots).annotations,
+      annotSettings: Annotations.snapshot(state.annots).annotSettings,
       drill: state.drill
     }
   end

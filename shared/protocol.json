@@ -148,6 +148,22 @@
       "v": "number",
       "points": "number",
       "ring": "string"
+    },
+    "Annotation": {
+      "id": "string",
+      "screenId": "string",
+      "by": "string",
+      "ctx": "string",
+      "tool": "'pen' | 'highlight' | 'rect' | 'arrow'",
+      "color": "string",
+      "width": "number",
+      "points": "number[]"
+    },
+    "AnnotSettings": {
+      "screenId": "string",
+      "locked": "boolean",
+      "spotlight": "number[] | null",
+      "ctx": "string"
     }
   },
   "join": {
@@ -170,6 +186,8 @@
       "jellos": "Jello[]",
       "pongs": "PongState[]",
       "darts": "Dart[]",
+      "annotations": "Annotation[]",
+      "annotSettings": "AnnotSettings[]",
       "serverTime": "number"
     },
     "errors": [
@@ -356,6 +374,47 @@
         "midi": "integer"
       },
       "reply": null
+    },
+    "annot_stroke": {
+      "payload": {
+        "screenId": "string",
+        "ctx": "string",
+        "tool": "'pen' | 'highlight' | 'rect' | 'arrow'",
+        "color": "string",
+        "width": "number",
+        "points": "number[]"
+      },
+      "reply": null
+    },
+    "annot_undo": {
+      "payload": {
+        "screenId": "string"
+      },
+      "reply": null
+    },
+    "annot_clear": {
+      "payload": {
+        "screenId": "string",
+        "all": "boolean"
+      },
+      "reply": null
+    },
+    "annot_laser": {
+      "payload": {
+        "screenId": "string",
+        "x": "number",
+        "y": "number"
+      },
+      "reply": null
+    },
+    "annot_settings": {
+      "payload": {
+        "screenId": "string",
+        "locked": "boolean",
+        "spotlight": "number[] | null",
+        "ctx": "string"
+      },
+      "reply": null
     }
   },
   "server": {
@@ -418,6 +477,22 @@
       "id": "string",
       "propId": "string",
       "midi": "number"
+    },
+    "annot_stroke": {
+      "stroke": "Annotation"
+    },
+    "annot_remove": {
+      "screenId": "string",
+      "ids": "string[]"
+    },
+    "annot_laser": {
+      "screenId": "string",
+      "id": "string",
+      "x": "number",
+      "y": "number"
+    },
+    "annot_settings": {
+      "settings": "AnnotSettings"
     }
   },
   "errors": [
@@ -430,6 +505,7 @@
     "unknown_screen",
     "unknown_prop",
     "livekit_disabled",
-    "cooldown"
+    "cooldown",
+    "locked"
   ]
 }

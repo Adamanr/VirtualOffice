@@ -310,4 +310,69 @@ defmodule OfficeWeb.SpaceChannelTest do
     ref = push(a, "note", %{"propId" => piano, "midi" => 200})
     assert_reply ref, :error, %{reason: "bad_payload"}
   end
+
+  test "drawing over a shared screen: neighbours draw, the presenter locks and clears" do
+    s = space()
+    {_, owner} = join_as(s, "player-aaaa")
+    {_, near} = join_as(s, "player-bbbb")
+    {_, far} = join_as(s, "player-cccc")
+    push(owner, "move", %{"s" => [12, 0, -5, 0, 0]})
+    push(near, "move", %{"s" => [10, 0, -3, 0, 0]})
+    push(far, "move", %{"s" => [2, 0, 12, 0, 0]})
+    Process.sleep(30)
+
+    ref =
+      push(owner, "screen_claim", %{
+        "screenId" => "hall_screen",
+        "mode" => "browser",
+        "url" => "https://example.com/"
+      })
+
+    assert_reply ref, :ok, _
+
+    stroke = %{
+      "screenId" => "hall_screen",
+      "ctx" => "https://example.com/",
+      "tool" => "pen",
+      "color" => "#30a46c",
+      "width" => 0.01,
+      "points" => [0.1, 0.1, 0.2, 0.2]
+    }
+
+    ref = push(near, "annot_stroke", stroke)
+    assert_reply ref, :ok
+    assert_broadcast "annot_stroke", %{stroke: %{by: "player-bbbb", screenId: "hall_screen"}}, 500
+
+    ref = push(far, "annot_stroke", stroke)
+    assert_reply ref, :error, %{reason: "too_far"}
+
+    ref =
+      push(near, "annot_settings", %{
+        "screenId" => "hall_screen",
+        "locked" => true,
+        "spotlight" => nil,
+        "ctx" => ""
+      })
+
+    assert_reply ref, :error, %{reason: "not_owner"}
+
+    ref =
+      push(owner, "annot_settings", %{
+        "screenId" => "hall_screen",
+        "locked" => true,
+        "spotlight" => [0.2, 0.2, 0.6, 0.6],
+        "ctx" => ""
+      })
+
+    assert_reply ref, :ok
+    ref = push(near, "annot_stroke", stroke)
+    assert_reply ref, :error, %{reason: "locked"}
+
+    ref = push(owner, "annot_clear", %{"screenId" => "hall_screen", "all" => true})
+    assert_reply ref, :ok
+    assert_broadcast "annot_remove", %{screenId: "hall_screen", ids: [_]}, 500
+
+    push(owner, "screen_release", %{"screenId" => "hall_screen"})
+    assert_broadcast "annot_settings", %{settings: %{screenId: "hall_screen", locked: false}}, 500
+  end
 end

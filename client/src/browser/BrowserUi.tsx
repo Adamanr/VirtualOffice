@@ -60,9 +60,12 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
     const canvas = stream.canvas
     canvas.className = 'browser-canvas'
     canvas.tabIndex = 0
+    canvas.dataset.annotTarget = ''
+
     el?.appendChild(canvas)
     if (control) canvas.focus()
     return () => {
+      delete canvas.dataset.annotTarget
       canvas.remove()
       stream.release()
     }

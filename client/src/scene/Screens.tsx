@@ -10,6 +10,7 @@ import { usePdfSource } from './PdfSource'
 import { useBrowserSource } from '../browser/useBrowserSource'
 import { browserStream, useBrowsers, VIEWPORT } from '../browser/stream'
 import { enterFocus } from '../browser/focus'
+import { AnnotationLayer } from '../annotate/AnnotationLayer'
 
 export interface ScreenSource {
   texture: THREE.Texture
@@ -172,6 +173,7 @@ export function ScreenPicture({
       }}
     >
       {cursor && source && <PageCursor screenId={screen.id} />}
+      {source && active && <AnnotationLayer screenId={screen.id} />}
     </mesh>
   )
 }

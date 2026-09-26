@@ -34,7 +34,7 @@ export function PdfOverlay({ screenId }: { screenId: string }) {
   return (
     <div className="pdf-overlay">
       <div ref={box} className="pdf-canvas-box">
-        <canvas ref={canvas} className="overlay-media pdf-canvas" />
+        <canvas ref={canvas} className="overlay-media pdf-canvas" data-annot-target />
       </div>
       <div className="pdf-controls">
         {mine && (

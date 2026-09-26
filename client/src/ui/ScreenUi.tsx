@@ -3,6 +3,7 @@ import { getScreen, getSeat, screenLabel } from '../lib/level'
 import { closeOverlay, openOverlay, shareScreen, stopPresenting } from '../screens/actions'
 import { standUp } from '../screens/seats'
 import { enterFocus } from '../browser/focus'
+import { AnnotationOverlay } from '../annotate/AnnotateUi'
 import { useGame } from '../store/game'
 import { useMedia } from '../store/media'
 import { usePlayers } from '../store/players'
@@ -117,6 +118,11 @@ export function InteractionMenu({ extra }: { extra?: (screenId: string) => React
         </>
       )}
       {screen && state && (
+        <button className="btn" onClick={() => openOverlay(screen.id)} title="Там же — рисовать поверх, указка, прожектор">
+          ✏️ Рисовать поверх экрана
+        </button>
+      )}
+      {screen && state && (
         <button className="btn" onClick={() => openOverlay(screen.id)}>
           {state.mode === 'browser' ? (mine ? '🌐 Открыть браузер (F)' : '🌐 Смотреть браузер (F)') : '🔍 Смотреть крупно (F)'}
         </button>
@@ -145,7 +151,7 @@ function OverlayVideo({ screenId }: { screenId: string }) {
     }
   }, [track])
   if (!track) return <div className="overlay-empty">Подключение к трансляции…</div>
-  return <video ref={ref} autoPlay muted playsInline className="overlay-media" />
+  return <video ref={ref} autoPlay muted playsInline className="overlay-media" data-annot-target />
 }
 
 /** Full-window 2D view of a screen: in 3D the text is too small to read. */
@@ -160,6 +166,7 @@ export function ScreenOverlay({
   const state = useScreens((s) => (overlay ? s.states[overlay] : undefined))
   const owner = usePlayers((s) => (state?.owner ? s.players[state.owner] : undefined))
   const screen = overlay ? getScreen(overlay) : undefined
+  const backdropDown = useRef(false)
 
   // Closes itself when the screen is released.
   useEffect(() => {
@@ -168,7 +175,15 @@ export function ScreenOverlay({
 
   if (!overlay || !screen || !state) return null
   return (
-    <div className="overlay" onClick={closeOverlay}>
+    <div
+      className="overlay"
+      // Close only on a genuine click on the backdrop (a drag that ends here must not close it).
+      onPointerDown={(e) => (backdropDown.current = e.target === e.currentTarget)}
+      onClick={(e) => {
+        if (backdropDown.current && e.target === e.currentTarget) closeOverlay()
+        backdropDown.current = false
+      }}
+    >
       <div className="overlay-bar" onClick={(e) => e.stopPropagation()}>
         <span>
           {screenLabel(screen)} · показывает <strong>{owner?.name ?? '…'}</strong>
@@ -183,6 +198,7 @@ export function ScreenOverlay({
           ✕ Закрыть (Esc)
         </button>
       </div>
+      <AnnotationOverlay screenId={overlay} />
       <div className="overlay-body" onClick={(e) => e.stopPropagation()}>
         {state.mode === 'share' ? (
           <OverlayVideo screenId={overlay} />

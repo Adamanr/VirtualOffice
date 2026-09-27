@@ -56,8 +56,8 @@ const carrying = (id: string | null | undefined) => {
 }
 
 /**
- * Materials of a loaded avatar, once per model: Lambert like the rest of the
- * office (no environment map needed), hair and lashes alpha-tested.
+ * Materials of a loaded avatar, once per model: matte PBR lit by the office
+ * environment like everything else, hair and lashes alpha-tested.
  */
 const prepared = new WeakSet<THREE.Object3D>()
 function prepare(scene: THREE.Object3D) {
@@ -66,14 +66,14 @@ function prepare(scene: THREE.Object3D) {
   scene.traverse((o) => {
     const mesh = o as THREE.SkinnedMesh
     if (!mesh.isMesh) return
-    const convert = (m: THREE.Material) => {
+    const matte = (m: THREE.Material) => {
       const std = m as THREE.MeshStandardMaterial
-      const lambert = new THREE.MeshLambertMaterial({ map: std.map, color: std.color, alphaTest: std.alphaTest, transparent: false, side: std.side })
-      lambert.name = std.name
-      m.dispose()
-      return lambert
+      std.metalness = 0
+      std.roughness = Math.max(std.roughness, 0.7)
+      std.transparent = false
+      return std
     }
-    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(convert) : convert(mesh.material)
+    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(matte) : matte(mesh.material)
   })
 }
 
@@ -91,8 +91,11 @@ export function Avatar({ id, look, getAnim, children }: AvatarProps) {
   const model = useMemo(() => {
     prepare(scene)
     const m = cloneSkinned(scene)
-    // Poses move vertices far from the bind-pose bounds (sitting, arms up).
-    m.traverse((o) => (o.frustumCulled = false))
+    m.traverse((o) => {
+      // Poses move vertices far from the bind-pose bounds (sitting, arms up).
+      o.frustumCulled = false
+      o.castShadow = true
+    })
     return m
   }, [scene])
   const hand = useMemo(() => model.getObjectByName('Bip01_R_Hand') ?? null, [model])
@@ -128,10 +131,12 @@ export function Avatar({ id, look, getAnim, children }: AvatarProps) {
     if (want === 'idle' && carrying(id)) want = 'drink'
     if (k < 1 && (gs!.type === 'use' || gs!.type === 'throw') && want !== 'sit') want = 'wave'
     const playing = current.current?.mixer === mixer ? current.current.clip : null
-    if (want !== playing) {
-      const next = actions.get(want)
-      const prev = playing ? actions.get(playing) : undefined
-      if (next) {
+    const next = actions.get(want)
+    // Also restart a clip that was stopped behind our back (Suspense hides and
+    // re-shows the tree, running effect cleanups; a T-pose otherwise).
+    if (next && (want !== playing || !next.isRunning())) {
+      const prev = playing && playing !== want ? actions.get(playing) : undefined
+      {
         next.reset()
         if (want === 'idle' || want === 'sit') next.time = offset % next.getClip().duration
         next.setEffectiveWeight(1).play()

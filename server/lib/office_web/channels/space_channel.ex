@@ -280,6 +280,16 @@ defmodule OfficeWeb.SpaceChannel do
     end
   end
 
+  defp handle_event(
+         "sticker_move",
+         %{"boardId" => board_id, "stickerId" => sticker_id, "x" => x, "y" => y},
+         socket
+       ) do
+    with :ok <- near_prop(socket, board_id) do
+      result(Space.sticker_move(socket.assigns.space_id, board_id, sticker_id, x, y), socket)
+    end
+  end
+
   defp handle_event("prop_use", %{"propId" => prop_id, "action" => action} = payload, socket) do
     with :ok <- near_prop(socket, prop_id) do
       case Space.prop_use(

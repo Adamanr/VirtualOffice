@@ -33,6 +33,8 @@ function CinemaView({ screenId }: { screenId: string }) {
       const box = canvas.getBoundingClientRect()
       if (el) {
         el.style.left = `${box.left + (stream.cursor.x / VIEWPORT.width) * box.width}px`
+        stream.cursorClient.x = box.left + (stream.cursor.x / VIEWPORT.width) * box.width
+        stream.cursorClient.y = box.top + (stream.cursor.y / VIEWPORT.height) * box.height
         el.style.top = `${box.top + (stream.cursor.y / VIEWPORT.height) * box.height}px`
       }
       raf = requestAnimationFrame(loop)

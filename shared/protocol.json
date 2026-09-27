@@ -303,6 +303,15 @@
       },
       "reply": null
     },
+    "sticker_move": {
+      "payload": {
+        "boardId": "string",
+        "stickerId": "string",
+        "x": "number",
+        "y": "number"
+      },
+      "reply": null
+    },
     "prop_use": {
       "payload": {
         "propId": "string",

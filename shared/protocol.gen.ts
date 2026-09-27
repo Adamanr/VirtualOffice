@@ -282,6 +282,13 @@ export interface StickerRemovePayload {
   stickerId: string;
 }
 
+export interface StickerMovePayload {
+  boardId: string;
+  stickerId: string;
+  x: number;
+  y: number;
+}
+
 export interface PropUsePayload {
   propId: string;
   action: 'buy' | 'kick' | 'use';
@@ -389,6 +396,7 @@ export interface ClientEvents {
   board_clear: { payload: BoardClearPayload; reply: null };
   sticker_add: { payload: StickerAddPayload; reply: null };
   sticker_remove: { payload: StickerRemovePayload; reply: null };
+  sticker_move: { payload: StickerMovePayload; reply: null };
   prop_use: { payload: PropUsePayload; reply: PropUseReply };
   toss: { payload: TossPayload; reply: null };
   alarm_pull: { payload: AlarmPullPayload; reply: null };
@@ -530,5 +538,5 @@ export interface ServerEvents {
 
 export type ProtocolError = 'bad_payload' | 'unknown_event' | 'rate_limited' | 'busy' | 'not_owner' | 'too_far' | 'unknown_screen' | 'unknown_prop' | 'livekit_disabled' | 'cooldown' | 'locked';
 
-export const CLIENT_EVENTS = ["move","media_state","set_look","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","prop_use","toss","alarm_pull","prank","browser_token","pong_join","pong_leave","pong_paddle","dart_throw","darts_clear","note","annot_stroke","annot_undo","annot_clear","annot_laser","annot_settings"] as const;
+export const CLIENT_EVENTS = ["move","media_state","set_look","livekit_token","screen_claim","screen_release","pdf_open","pdf_page","chat_send","react","board_stroke","board_clear","sticker_add","sticker_remove","sticker_move","prop_use","toss","alarm_pull","prank","browser_token","pong_join","pong_leave","pong_paddle","dart_throw","darts_clear","note","annot_stroke","annot_undo","annot_clear","annot_laser","annot_settings"] as const;
 export const SERVER_EVENTS = ["batch","correction","screen_update","chat","reaction","board_stroke","board_clear","sticker_update","prop_event","toss","scores","drill","desk_update","pong_state","dart","darts_clear","note","annot_stroke","annot_remove","annot_laser","annot_settings"] as const;

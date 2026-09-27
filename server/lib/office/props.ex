@@ -186,6 +186,23 @@ defmodule Office.Props do
     end
   end
 
+  @doc "Moves a sticker (anyone may: it's a cork board) and brings it to the top of the pile."
+  @spec move_sticker(t(), Level.t(), String.t(), String.t(), number(), number()) ::
+          {:ok, t(), [sticker()]} | {:error, atom()}
+  def move_sticker(state, level, board_id, sticker_id, x, y) do
+    with {:ok, %{type: "bulletin_board"}} <- fetch_prop(level, board_id),
+         list = Map.get(state.stickers, board_id, []),
+         %{} = sticker <- Enum.find(list, &(&1.id == sticker_id)) do
+      moved = %{sticker | x: clamp01(x), y: clamp01(y)}
+      list = [moved | Enum.reject(list, &(&1.id == sticker_id))]
+      {:ok, put_in(state.stickers[board_id], list), list}
+    else
+      {:ok, _} -> {:error, :unknown_prop}
+      nil -> {:error, :bad_payload}
+      err -> err
+    end
+  end
+
   # --- appliances & vending ------------------------------------------------------------------
 
   @doc """

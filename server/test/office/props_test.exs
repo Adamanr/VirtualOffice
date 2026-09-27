@@ -55,4 +55,21 @@ defmodule Office.PropsTest do
     assert [] = Props.snapshot(p).jellos
     assert {:error, :unknown_prop} = Props.toggle_jello(p, l, "desk_nope", "jim")
   end
+
+  test "stickers can be moved by anyone and come to the top", %{level: l, props: p, find: find} do
+    board = find.("bulletin_board")
+    url = "/api/uploads/abcdefghijklmnop.png"
+    {:ok, p, _} = Props.add_sticker(p, l, board, "player-a", url, 0.2, 0.2, 0)
+    {:ok, p, [top, first]} = Props.add_sticker(p, l, board, "player-a", url, 0.5, 0.5, 0)
+
+    {:ok, _p, [moved, ^top]} = Props.move_sticker(p, l, board, first.id, 0.9, 1.4)
+    assert moved.id == first.id
+    assert {moved.x, moved.y} == {0.9, 1.0}
+    assert moved.from == "player-a"
+
+    assert {:error, :bad_payload} = Props.move_sticker(p, l, board, "nope", 0.1, 0.1)
+
+    assert {:error, :unknown_prop} =
+             Props.move_sticker(p, l, find.("whiteboard"), first.id, 0.1, 0.1)
+  end
 end

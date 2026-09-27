@@ -1,8 +1,10 @@
 import { Environment } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { EffectComposer, N8AO } from '@react-three/postprocessing'
 import { Physics } from '@react-three/rapier'
-import { Component, Suspense, type ReactNode } from 'react'
+import { Component, Suspense, useEffect, useRef, type ReactNode } from 'react'
+import { useBrowsers } from '../browser/stream'
+import { useScreens } from '../store/screens'
 import { level } from '../lib/level'
 import { CameraRig } from './CameraRig'
 import { GlbLevel } from './GlbLevel'
@@ -58,7 +60,7 @@ function Lighting() {
         intensity={1.6}
         color="#fff6e8"
         castShadow={!LOW_GFX}
-        shadow-mapSize={[4096, 4096]}
+        shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
         shadow-camera-left={-half}
@@ -72,6 +74,51 @@ function Lighting() {
       </directionalLight>
     </>
   )
+}
+
+/**
+ * Shadows are re-rendered ~12 times a second instead of every frame: the
+ * furniture never moves and people's shadows don't need 60 Hz.
+ */
+function ShadowCadence() {
+  const gl = useThree((s) => s.gl)
+  const last = useRef(0)
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false
+    gl.shadowMap.needsUpdate = true
+    return () => void (gl.shadowMap.autoUpdate = true)
+  }, [gl])
+  useFrame(({ clock }) => {
+    if (clock.elapsedTime - last.current > 0.08) {
+      last.current = clock.elapsedTime
+      gl.shadowMap.needsUpdate = true
+    }
+  })
+  return null
+}
+
+/**
+ * While a full-window view covers the office (the browser / PDF window, the
+ * cinema view of a fullscreen video), the 3D scene behind it is drawn at 5 fps:
+ * the GPU and main thread go to the page you're looking at.
+ */
+function BackgroundThrottle() {
+  const overlay = useScreens((s) => !!s.overlay)
+  const focus = useScreens((s) => s.focus)
+  const cinema = useBrowsers((s) => (focus ? !!s[focus]?.fullscreen : false))
+  const setFrameloop = useThree((s) => s.setFrameloop)
+  const invalidate = useThree((s) => s.invalidate)
+  const hidden = overlay || cinema
+  useEffect(() => {
+    if (!hidden) return
+    setFrameloop('demand')
+    const t = setInterval(() => invalidate(), 200)
+    return () => {
+      clearInterval(t)
+      setFrameloop('always')
+    }
+  }, [hidden, setFrameloop, invalidate])
+  return null
 }
 
 export function Scene({ self, children }: { self?: ReactNode; children?: ReactNode }) {
@@ -89,9 +136,11 @@ export function Scene({ self, children }: { self?: ReactNode; children?: ReactNo
       <Suspense fallback={null}>
         <Lighting />
       </Suspense>
+      {!LOW_GFX && <ShadowCadence />}
+      <BackgroundThrottle />
       {!LOW_GFX && (
-        <EffectComposer multisampling={4} enableNormalPass={false}>
-          <N8AO aoRadius={0.9} intensity={2.2} distanceFalloff={0.6} halfRes quality="medium" />
+        <EffectComposer multisampling={2} enableNormalPass={false}>
+          <N8AO aoRadius={0.9} intensity={2.2} distanceFalloff={0.6} halfRes quality="performance" />
         </EffectComposer>
       )}
       <Physics timeStep="vary">

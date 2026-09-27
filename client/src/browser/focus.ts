@@ -3,6 +3,7 @@ import { useScreens } from '../store/screens'
 import { usePlayers } from '../store/players'
 import { notify, useGame } from '../store/game'
 import { modifiers, VIEWPORT } from './input'
+import { openContextMenu } from './contextMenu'
 import { browserStream, useBrowsers } from './stream'
 
 /**
@@ -13,6 +14,29 @@ import { browserStream, useBrowsers } from './stream'
  */
 const BUTTON = ['left', 'middle', 'right'] as const
 let cleanup: (() => void) | null = null
+/** The context menu is open: pointer lock is released but we're still "in" the screen. */
+let suspended = false
+let lockedCanvas: HTMLCanvasElement | null = null
+
+/** Right-click menu: free the mouse without leaving the screen. */
+function suspendForMenu() {
+  suspended = true
+  document.exitPointerLock()
+}
+
+/** After the context menu: back to the page (a user gesture re-locks the mouse) or out of the screen. */
+export function resumeFocus(relock: boolean) {
+  if (!suspended) return
+  suspended = false
+  if (relock && lockedCanvas) {
+    try {
+      const p = lockedCanvas.requestPointerLock() as unknown as Promise<void> | undefined
+      p?.catch?.(() => exitFocus())
+    } catch {
+      exitFocus()
+    }
+  } else exitFocus()
+}
 
 function canvasEl(): HTMLCanvasElement | null {
   return document.querySelector('.office canvas')
@@ -47,6 +71,8 @@ export function enterFocus(screenId: string) {
 }
 
 export function exitFocus() {
+  suspended = false
+  lockedCanvas = null
   cleanup?.()
   cleanup = null
   if (document.pointerLockElement) document.exitPointerLock()
@@ -58,6 +84,8 @@ function install(screenId: string, canvas: HTMLCanvasElement, onError: () => voi
   const stream = browserStream(screenId)
   stream.acquire()
   const unblock = blockKeyboard()
+  lockedCanvas = canvas
+  suspended = false
   let lastMove = 0
   // Page pixels per screen pixel: the framed screen fills ~90% of the window width.
   const speed = () => VIEWPORT.width / (window.innerWidth * 0.9)
@@ -78,10 +106,16 @@ function install(screenId: string, canvas: HTMLCanvasElement, onError: () => voi
   const down = (e: MouseEvent) => {
     if (document.pointerLockElement !== canvas) return
     e.preventDefault()
+    if (e.button === 2) {
+      // The browser-like menu: the service does the page's right click itself.
+      openContextMenu(screenId, stream.cursorClient.x, stream.cursorClient.y, stream.cursor, true)
+      suspendForMenu()
+      return
+    }
     send('mousePressed', e)
   }
   const up = (e: MouseEvent) => {
-    if (document.pointerLockElement !== canvas) return
+    if (document.pointerLockElement !== canvas || e.button === 2) return
     send('mouseReleased', e)
   }
   const wheel = (e: WheelEvent) => {
@@ -91,7 +125,7 @@ function install(screenId: string, canvas: HTMLCanvasElement, onError: () => voi
     stream.send({ t: 'wheel', x: Math.round(stream.cursor.x), y: Math.round(stream.cursor.y), dx: e.deltaX * scale, dy: e.deltaY * scale })
   }
   const key = (type: 'keyDown' | 'keyUp') => (e: KeyboardEvent) => {
-    if (e.isComposing || e.key === 'Escape') return
+    if (e.isComposing || e.key === 'Escape' || suspended) return
     // Tabs: Alt+T new, Alt+W close, Alt+, / Alt+. previous / next (Ctrl+T/W belong to your own browser).
     if (e.altKey && !e.ctrlKey && ['KeyT', 'KeyW', 'Comma', 'Period'].includes(e.code)) {
       e.preventDefault()
@@ -117,7 +151,7 @@ function install(screenId: string, canvas: HTMLCanvasElement, onError: () => voi
     e.preventDefault()
   }
   const lockChange = () => {
-    if (document.pointerLockElement !== canvas) exitFocus()
+    if (document.pointerLockElement !== canvas && !suspended) exitFocus()
   }
   const menu = (e: Event) => e.preventDefault()
 

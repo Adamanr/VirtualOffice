@@ -16,8 +16,8 @@ import { useScreens } from '../store/screens'
 import { Avatar } from './Avatar'
 
 // Close to the motion-captured clips (≈1.4 and ≈3.5 m/s) sped up a little: feet mostly stay planted.
-const WALK_SPEED = 2.2
-const RUN_SPEED = 5
+const WALK_SPEED = 1.8
+const RUN_SPEED = 4
 const GRAVITY = 20
 const CAPSULE_HALF = 0.5
 const CAPSULE_RADIUS = 0.35

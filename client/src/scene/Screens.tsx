@@ -105,7 +105,8 @@ const cursorMaterial = new THREE.MeshBasicMaterial({ map: cursorTexture, transpa
 function PageCursor({ screenId }: { screenId: string }) {
   const ref = useRef<THREE.Mesh>(null)
   const stream = useMemo(() => browserStream(screenId), [screenId])
-  useFrame(() => {
+  const at = useMemo(() => new THREE.Vector3(), [])
+  useFrame(({ camera, size: view }) => {
     const m = ref.current
     const parent = m?.parent
     if (!m || !parent) return
@@ -113,6 +114,10 @@ function PageCursor({ screenId }: { screenId: string }) {
     const size = 0.035
     m.position.set(stream.cursor.x / VIEWPORT.width - 0.5, 0.5 - stream.cursor.y / VIEWPORT.height, 0.002)
     m.scale.set(size, (size * parent.scale.x) / Math.max(0.001, parent.scale.y), 1)
+    // Where the arrow is in the window (the context menu opens there).
+    m.getWorldPosition(at).project(camera)
+    stream.cursorClient.x = view.left + ((at.x + 1) / 2) * view.width
+    stream.cursorClient.y = view.top + ((1 - at.y) / 2) * view.height
   })
   return <mesh ref={ref} geometry={cursorGeometry} material={cursorMaterial} renderOrder={2} />
 }

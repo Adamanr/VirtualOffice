@@ -11,7 +11,8 @@ def get(path, dest):
     print('got', dest, os.path.getsize(dest) // 1024, 'K', flush=True)
 avatars = [('Professions', f'Business_Male_0{i}') for i in (1,2,3,4)] + [('Professions', f'Business_Female_0{i}') for i in (1,2,3,4)] \
   + [('Adults', 'Male_Adult_01'), ('Adults', 'Male_Adult_03'), ('Adults', 'Female_Adult_01'), ('Adults', 'Female_Adult_03')]
-for group, name in avatars:
+ONLY_ANIMS = len(sys.argv) > 1 and sys.argv[1] == 'anims'
+for group, name in ([] if ONLY_ANIMS else avatars):
     base = f'Assets/Avatars/{group}/{name}'
     get(f'{base}/Export/{name}.fbx', f'avatars/{name}/{name}.fbx')
     for t in ls(f'{base}/Textures'):

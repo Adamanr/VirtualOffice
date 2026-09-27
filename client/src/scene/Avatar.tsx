@@ -19,13 +19,14 @@ interface AvatarProps {
 type Clip = 'idle' | 'walk' | 'run' | 'sit' | 'wave' | 'drink'
 
 /** Playback speed so feet roughly match the ground speed (see LocalPlayer WALK/RUN_SPEED). */
-const TIME_SCALE: Record<Clip, number> = { idle: 1, walk: 1.55, run: 1.4, sit: 1, wave: 1.3, drink: 1 }
+/** Playback speed of the clips that don't follow the ground speed. */
+const TIME_SCALE: Record<Clip, number> = { idle: 1, walk: 1, run: 1, sit: 1, wave: 1.3, drink: 1 }
 /** Pelvis height (m) in the sitting clip; our seats put the hips at SEAT_HIPS. */
 const SIT_PELVIS = { m: 0.59, f: 0.61 }
 const SEAT_HIPS = 0.5
 
 /**
- * The walk and run clips still carry their forward travel in the pelvis track:
+ * The walk and run clips still carry their forward travel in the root track:
  * remove the linear trend so people walk in place (the game moves them), keeping
  * the natural bob and sway. Done once per shared clip.
  */
@@ -34,19 +35,24 @@ function makeInPlace(clip: THREE.AnimationClip) {
   if (inPlace.has(clip)) return
   inPlace.add(clip)
   for (const track of clip.tracks) {
-    if (!track.name.endsWith('Pelvis.position')) continue
+    // The root joint carries the body's travel (and its bob, which stays).
+    if (!track.name.endsWith('Pelvis.position') && track.name !== 'Bip01.position') continue
     const { times, values } = track
     const n = times.length
     if (n < 2) continue
     const t0 = times[0]!
     const span = times[n - 1]! - t0
+    const travel = [0, 1, 2].map((c) => values[(n - 1) * 3 + c]! - values[c]!)
     for (let c = 0; c < 3; c++) {
-      const first = values[c]!
-      const drift = values[(n - 1) * 3 + c]! - first
-      for (let i = 0; i < n; i++) values[i * 3 + c]! -= (drift * (times[i]! - t0)) / span
+      for (let i = 0; i < n; i++) values[i * 3 + c]! -= (travel[c]! * (times[i]! - t0)) / span
     }
+    // Ground speed the clip was recorded at (the root moves in metres).
+    if (track.name === 'Bip01.position') clipSpeed.set(clip, Math.hypot(travel[0]!, travel[2]!) / span)
   }
 }
+
+/** Metres per second each locomotion clip covers, measured from its root travel. */
+const clipSpeed = new WeakMap<THREE.AnimationClip, number>()
 const FADE = 0.25
 
 /** Is this player carrying something right now (a coffee, a snack…)? */
@@ -113,6 +119,10 @@ export function Avatar({ id, look, getAnim, children }: AvatarProps) {
   }, [animations, mixer])
   useEffect(() => () => void mixer.stopAllAction(), [mixer])
 
+  const here = useMemo(() => new THREE.Vector3(), [])
+  const lastPos = useRef<THREE.Vector3 | null>(null)
+  const speed = useRef(0)
+  const pending = useRef<{ want: Clip | null; since: number }>({ want: null, since: 0 })
   // Which clip plays on which mixer: a new model (another person) starts from scratch.
   const current = useRef<{ mixer: THREE.AnimationMixer; clip: Clip } | null>(null)
   // Random start phase so idle people don't breathe in sync.
@@ -130,19 +140,43 @@ export function Avatar({ id, look, getAnim, children }: AvatarProps) {
     let want: Clip = anim === Anim.run ? 'run' : anim === Anim.walk ? 'walk' : anim === Anim.sit ? 'sit' : 'idle'
     if (want === 'idle' && carrying(id)) want = 'drink'
     if (k < 1 && (gs!.type === 'use' || gs!.type === 'throw') && want !== 'sit') want = 'wave'
+    // Ground speed of this figure (local or remote alike), smoothed.
+    g.getWorldPosition(here)
+    if (lastPos.current) {
+      const inst = Math.hypot(here.x - lastPos.current.x, here.z - lastPos.current.z) / Math.max(dt, 1e-3)
+      speed.current += (Math.min(inst, 8) - speed.current) * (1 - Math.exp(-dt * 8))
+    }
+    lastPos.current = (lastPos.current ?? new THREE.Vector3()).copy(here)
+
+    // A new state has to hold for a moment: network jitter or brushing a wall
+    // mustn't flick between idle and walk (each switch is a visible hitch).
+    const now = performance.now()
+    if (pending.current.want !== want) pending.current = { want, since: now }
     const playing = current.current?.mixer === mixer ? current.current.clip : null
-    const next = actions.get(want)
+    const settled = !playing || want === 'sit' || playing === 'sit' || now - pending.current.since > 120
+    const target = settled ? want : playing!
+    const next = actions.get(target)
     // Also restart a clip that was stopped behind our back (Suspense hides and
     // re-shows the tree, running effect cleanups; a T-pose otherwise).
-    if (next && (want !== playing || !next.isRunning())) {
-      const prev = playing && playing !== want ? actions.get(playing) : undefined
-      {
+    if (next && (target !== playing || !next.isRunning())) {
+      const prev = playing && playing !== target ? actions.get(playing) : undefined
+      const stride = (c: Clip | null) => c === 'walk' || c === 'run'
+      if (!next.isRunning() || next.getEffectiveWeight() < 0.01) {
         next.reset()
-        if (want === 'idle' || want === 'sit') next.time = offset % next.getClip().duration
-        next.setEffectiveWeight(1).play()
-        if (prev) prev.crossFadeTo(next, FADE, false)
-        current.current = { mixer, clip: want }
+        if (prev && stride(target) && stride(playing)) {
+          // Walk ⇄ run: keep the step phase, so the feet don't skip.
+          next.time = (prev.time / prev.getClip().duration) * next.getClip().duration
+        } else if (target === 'idle' || target === 'sit') next.time = offset % next.getClip().duration
       }
+      next.setEffectiveWeight(1).play()
+      if (prev) prev.crossFadeTo(next, target === 'sit' || playing === 'sit' ? 0.35 : FADE, false)
+      current.current = { mixer, clip: target }
+    }
+    // Feet on the ground: the step rate follows the actual speed.
+    for (const c of ['walk', 'run'] as const) {
+      const a = actions.get(c)
+      const native = a ? clipSpeed.get(a.getClip()) : undefined
+      if (a && native) a.timeScale = speed.current > 0.3 ? THREE.MathUtils.clamp(speed.current / native, 0.6, 1.9) : 1
     }
     mixer.update(dt)
 

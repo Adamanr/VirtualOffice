@@ -220,6 +220,12 @@ export async function removeSticker(boardId: string, stickerId: string) {
   await request(() => conn.request('sticker_remove', { boardId, stickerId }))
 }
 
+export async function moveSticker(boardId: string, stickerId: string, x: number, y: number) {
+  const conn = getConnection()
+  if (!conn) return
+  await request(() => conn.request('sticker_move', { boardId, stickerId, x, y }))
+}
+
 export function propLabel(propId: string) {
   return getProp(propId)?.label ?? ''
 }

@@ -288,6 +288,54 @@ export class BrowserSession {
     await tab?.page.goto(`chrome-extension://${runtimeId}/${page}`).catch(() => {})
   }
 
+  // --- context menu -------------------------------------------------------------------------
+
+  /**
+   * A right click at (x, y) in viewer coordinates: the page gets a real right
+   * click (so sites with their own menu — docs, maps — open it), and the viewer
+   * gets what's under the cursor for the browser-like menu, unless the page
+   * showed its own (it prevented the default `contextmenu`).
+   */
+  async contextMenu(msg, ws) {
+    const tab = this.active
+    if (!tab || typeof msg.x !== 'number' || typeof msg.y !== 'number') return
+    const x = Math.max(0, msg.x) * this.inputScale
+    const y = Math.max(0, msg.y) * this.inputScale
+    const page = tab.page
+    try {
+      await page.evaluate(() => {
+        window.__officeMenu = false
+        window.addEventListener('contextmenu', (e) => (window.__officeMenu = e.defaultPrevented), { once: true })
+      })
+      for (const type of ['mousePressed', 'mouseReleased']) {
+        await tab.cdp.send('Input.dispatchMouseEvent', { type, x, y, button: 'right', buttons: type === 'mousePressed' ? 2 : 0, clickCount: 1 })
+      }
+      const info = await page.evaluate(
+        (px, py) => {
+          const el = document.elementFromPoint(px, py)
+          const link = el?.closest('a[href]')
+          const img = el?.closest('img')
+          const editable = !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA'].includes(el.tagName))
+          return {
+            link: link ? link.href : null,
+            image: img ? img.currentSrc || img.src : null,
+            selection: String(window.getSelection() ?? '').slice(0, 20000),
+            editable,
+            pageMenu: window.__officeMenu === true,
+          }
+        },
+        x,
+        y,
+      )
+      const history = await tab.cdp.send('Page.getNavigationHistory').catch(() => null)
+      const canBack = !!history && history.currentIndex > 0
+      const canForward = !!history && history.currentIndex < history.entries.length - 1
+      if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'context', x: msg.x, y: msg.y, ...info, canBack, canForward }))
+    } catch (e) {
+      this.log('context menu failed', e.message)
+    }
+  }
+
   // --- viewers ------------------------------------------------------------------------------
 
   /** Handles a message from a viewer; only controllers may drive the page. */
@@ -324,6 +372,10 @@ export class BrowserSession {
         return hooks.removeExtension?.(msg.id)
       case 'ext_open':
         return this.openExtensionPage(msg.id, msg.page === 'options' ? 'options' : 'popup')
+      case 'context':
+        return this.contextMenu(msg, ws)
+      case 'select_all':
+        return page?.evaluate(() => document.execCommand('selectAll')).catch(() => {})
       default: {
         const cmd = toCdp(msg, this.mouse)
         if (!cmd || !this.active) return

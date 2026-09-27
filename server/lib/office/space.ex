@@ -84,6 +84,9 @@ defmodule Office.Space do
   def sticker_remove(space_id, board_id, sticker_id),
     do: call(space_id, {:sticker_remove, board_id, sticker_id})
 
+  def sticker_move(space_id, board_id, sticker_id, x, y),
+    do: call(space_id, {:sticker_move, board_id, sticker_id, x, y})
+
   def prop_use(space_id, player_id, prop_id, action, item),
     do: call(space_id, {:prop_use, player_id, prop_id, action, item})
 
@@ -273,6 +276,17 @@ defmodule Office.Space do
 
   def handle_call({:sticker_remove, board_id, sticker_id}, _from, state) do
     case Props.remove_sticker(state.props, state.level, board_id, sticker_id) do
+      {:ok, props, stickers} ->
+        broadcast(state, "sticker_update", %{boardId: board_id, stickers: stickers})
+        {:reply, :ok, %{state | props: props}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:sticker_move, board_id, sticker_id, x, y}, _from, state) do
+    case Props.move_sticker(state.props, state.level, board_id, sticker_id, x, y) do
       {:ok, props, stickers} ->
         broadcast(state, "sticker_update", %{boardId: board_id, stickers: stickers})
         {:reply, :ok, %{state | props: props}}

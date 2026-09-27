@@ -5,6 +5,7 @@ import { useScreens } from '../store/screens'
 import { openBrowser } from './actions'
 import { modifiers, toPage } from './input'
 import { browserStream, collapsePage, useBrowsers } from './stream'
+import { openContextMenu } from './contextMenu'
 import { ExtensionsPanel, TabsBar } from './TabsBar'
 
 /** Real fullscreen for the 2D browser window (anyone watching). */
@@ -80,6 +81,12 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
     if (!control) return
     let lastMove = 0
     const mouse = (type: string) => (e: MouseEvent) => {
+      if (e.button === 2 && type !== 'mouseMoved') {
+        // Right click: the browser-like menu (the service clicks the page itself).
+        e.preventDefault()
+        if (type === 'mousePressed') openContextMenu(screenId, e.clientX, e.clientY, toPage(e, canvas), false)
+        return
+      }
       if (type === 'mouseMoved') {
         const now = performance.now()
         if (now - lastMove < 30) return
@@ -136,7 +143,7 @@ export function BrowserOverlay({ screenId }: { screenId: string }) {
       canvas.removeEventListener('compositionend', compose)
       canvas.removeEventListener('contextmenu', menu)
     }
-  }, [stream, control])
+  }, [stream, control, screenId])
 
   // The page went fullscreen (a video's ⛶): take the whole real screen too.
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { receiveContext, type ContextInfo } from './contextMenu'
 import { getConnection } from '../net/session'
 
 import { VIEWPORT } from './input'
@@ -57,6 +58,8 @@ class BrowserStream {
   readonly audio = new TabAudio()
   /** The presenter's cursor on the page (page pixels), for everyone. */
   readonly cursor = { x: VIEWPORT.width / 2, y: VIEWPORT.height / 2 }
+  /** Where that cursor currently is in the window (CSS px), wherever the page is drawn. */
+  readonly cursorClient = { x: innerWidth / 2, y: innerHeight / 2 }
   private audioOn = true
   /** Bumped when the frame size changes (textures must be re-created). */
   resized = 0
@@ -155,6 +158,7 @@ class BrowserStream {
               status: 'live',
               error: null,
             })
+          if (msg.t === 'context') receiveContext(this.screenId, msg as unknown as ContextInfo)
           if (msg.t === 'notice' && msg.message) notify(msg.message)
           if (msg.t === 'error') this.patch({ error: msg.message ?? 'Ошибка' })
         } catch {

@@ -1,3 +1,4 @@
+import { BrowserContextMenu } from '../browser/ContextMenu'
 import { CharacterDialog } from './CharacterEditor'
 import { useEffect, useState } from 'react'
 import { setKeyboardActive } from '../input/keyboard'
@@ -114,6 +115,7 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
       <GameHud />
       <TabHud />
       <Cinema />
+      <BrowserContextMenu />
       <PdfHint />
       <ScreenOverlay renderPdf={(id) => <PdfOverlay screenId={id} />} renderBrowser={(id) => <BrowserOverlay screenId={id} />} />
       <PropOverlays />

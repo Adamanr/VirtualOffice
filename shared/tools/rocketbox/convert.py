@@ -163,13 +163,15 @@ def convert_avatar(avatar_id, name):
 
 
 def strip_channels(action):
-    """Rotations only (plus the pelvis position, for the hip sway and sitting):
+    """Rotations only, plus the root's position (hip bob, weight shifts, sitting down):
     bone offsets and scales come from each avatar's own skeleton, so people of
     different builds share the clips without stretching."""
     curves = action.fcurves if hasattr(action, "fcurves") else [c for layer in action.layers for strip in layer.strips for bag in strip.channelbags for c in bag.fcurves]
     for fc in list(curves):
         path = fc.data_path
-        keep = path.endswith("rotation_quaternion") or path.endswith("rotation_euler") or (path.endswith("location") and "Pelvis" in path)
+        # The root (the armature object itself: path "location") carries the body's
+        # travel, bob and sitting height; bones keep only their rotations.
+        keep = path.endswith("rotation_quaternion") or path.endswith("rotation_euler") or path == "location" or (path.endswith("location") and "Pelvis" in path)
         if not keep:
             try:
                 action.fcurves.remove(fc)

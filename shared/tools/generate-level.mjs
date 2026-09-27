@@ -49,7 +49,7 @@ for (const cz of [4.5, 10.5]) {
     add('trash_bin', cx + 1.6, cz - 1.0)
   }
 }
-for (const [x, z] of [[-0.6, 7.5], [-6, 7.5], [-12, 7.5], [-19.3, 14.3], [-19.3, -2.3], [3.65, 14.3]]) add('plant', x, z)
+for (const [x, z] of [[-0.6, 7.5], [-6, 7.5], [-12, 7.5], [-19.3, 14.3], [-19.3, -2.3], [3.55, 14.25]]) add('plant', x, z)
 
 // Reception at the entrance.
 add('reception_desk', -0.6, 12.2, FACE_E, { size: [2.4, 0.8] })
@@ -59,7 +59,7 @@ add('sofa', -19.1, 12.6, FACE_E, { size: [2.4, 0.9] })
 add('coffee_table', -17.2, 12.6, 0, { size: [0.7, 1.4] })
 add('bookshelf', -19.72, 0.6, FACE_E, { size: [0.9, 0.35] })
 add('bookshelf', -19.72, 1.6, FACE_E, { size: [0.9, 0.35] })
-add('filing_cabinet', -19.68, 2.5, FACE_E)
+add('filing_cabinet', -19.57, 2.5, FACE_E)
 add('whiteboard', -19.88, 7.75, FACE_E, { elevation: 1.55, size: [2.2, 1.1] })
 
 // Corridor between the conference rooms and the hall.
@@ -97,8 +97,8 @@ add('chair', -4.4, -9.2, FACE_S)
 add('sofa', -0.58, -6.2, FACE_W, { size: [2.4, 0.9] })
 add('coffee_table', -2.5, -6.2, 0, { size: [0.7, 1.3] })
 add('bookshelf', -9.72, -12.6, FACE_E, { size: [0.9, 0.35] })
-add('filing_cabinet', -9.68, -11.7, FACE_E)
-add('filing_cabinet', -9.68, -11.1, FACE_E)
+add('filing_cabinet', -9.57, -11.7, FACE_E)
+add('filing_cabinet', -9.57, -11.1, FACE_E)
 add('plant', -9.3, -3.7)
 add('picture', -9.88, -7.5, FACE_E, { elevation: 1.7, size: [1.2, 0.8] })
 add('picture', -0.12, -10.5, FACE_W, { elevation: 1.7, size: [0.7, 0.9] })

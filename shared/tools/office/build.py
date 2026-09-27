@@ -37,8 +37,9 @@ def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
-def material(name, color=(0.8, 0.8, 0.8), rough=0.6, metal=0.0, tex=None, tint=None, emission=None, alpha=None):
-    """Principled material; `tex` = Poly Haven texture set name (diffuse / nor_gl / rough)."""
+def material(name, color=(0.8, 0.8, 0.8), rough=0.6, metal=0.0, tex=None, tint=None, emission=None, alpha=None, relief_only=False):
+    """Principled material; `tex` = Poly Haven texture set name (diffuse / nor_gl / rough).
+    `relief_only`: a plain colour with the texture's weave (normal + roughness) only."""
     m = bpy.data.materials.get(name)
     if m:
         return m
@@ -49,7 +50,7 @@ def material(name, color=(0.8, 0.8, 0.8), rough=0.6, metal=0.0, tex=None, tint=N
     bsdf.inputs["Base Color"].default_value = (*color, 1)
     bsdf.inputs["Roughness"].default_value = rough
     bsdf.inputs["Metallic"].default_value = metal
-    if tex:
+    if tex and not relief_only:
         img = load(f"{tex}_diffuse.jpg")
         t = nt.nodes.new("ShaderNodeTexImage")
         t.image = img
@@ -63,6 +64,7 @@ def material(name, color=(0.8, 0.8, 0.8), rough=0.6, metal=0.0, tex=None, tint=N
             nt.links.new(mix.outputs["Result"], bsdf.inputs["Base Color"])
         else:
             nt.links.new(t.outputs["Color"], bsdf.inputs["Base Color"])
+    if tex:
         n = nt.nodes.new("ShaderNodeTexImage")
         n.image = load(f"{tex}_nor_gl.jpg", non_color=True)
         nm = nt.nodes.new("ShaderNodeNormalMap")
@@ -165,6 +167,22 @@ def export(name, image_format="WEBP"):
     )
     tris = sum(len(p.vertices) - 2 for o in bpy.context.scene.objects if o.type == "MESH" for p in o.data.polygons)
     print(f"MODEL {name}: {tris} tris, {os.path.getsize(path) // 1024} KB", flush=True)
+    record_bounds(name)
+
+
+def record_bounds(name):
+    """Bounding box in glTF axes (x, y up, z = Blender -y) → <out>/models.json, used to
+    fit models to the level's items without loading them first (and by the tests)."""
+    import json
+
+    pts = [o.matrix_world @ mathutils.Vector(c) for o in bpy.context.scene.objects if o.type == "MESH" for c in o.bound_box]
+    lo = [min(p.x for p in pts), min(p.z for p in pts), min(-p.y for p in pts)]
+    hi = [max(p.x for p in pts), max(p.z for p in pts), max(-p.y for p in pts)]
+    path = os.path.join(OUT, "models.json")
+    data = json.load(open(path)) if os.path.exists(path) else {}
+    data[name] = {"min": [round(v, 4) for v in lo], "max": [round(v, 4) for v in hi]}
+    with open(path, "w") as f:
+        json.dump(dict(sorted(data.items())), f, indent=1)
 
 
 def wanted(name):
@@ -184,8 +202,11 @@ def mats():
         "painted_metal": material("painted_metal", (0.52, 0.53, 0.5), 0.45, 0.35),
         "screen": material("screen", (0.01, 0.012, 0.015), 0.12),
         "wood": material("wood", tex="laminate_floor_02", rough=0.5),
-        "fabric": material("fabric", tex="fabric_pattern_05", tint=(0.55, 0.58, 0.63)),
-        "chair_fabric": material("chair_fabric", tex="fabric_pattern_05", tint=(0.16, 0.18, 0.21)),
+        "fabric": material("fabric", (0.48, 0.52, 0.57), 0.9, tex="fabric_pattern_05", relief_only=True),
+        "chair_fabric": material("chair_fabric", (0.13, 0.14, 0.16), 0.85, tex="fabric_pattern_05", relief_only=True),
+        "sofa_fabric": material("sofa_fabric", (0.24, 0.28, 0.33), 0.9, tex="fabric_pattern_05", relief_only=True),
+        "seat_fabric": material("seat_fabric", (0.16, 0.24, 0.4), 0.85, tex="fabric_pattern_05", relief_only=True),
+        "oak": material("oak", (0.62, 0.45, 0.3), 0.55),
         "countertop": material("countertop", (0.78, 0.76, 0.72), 0.35),
         "glass": material("glass", (0.55, 0.7, 0.8), 0.05, alpha=0.35),
         "light": material("light", (1, 1, 1), 0.5, emission=(1.0, 0.98, 0.94)),
@@ -199,15 +220,11 @@ POLYHAVEN = {
     "plant_tall": ("potted_plant_01", 16000),
     "plant_leafy": ("potted_plant_02", 14000),
     "succulent": ("potted_plant_04", 3000),
-    "sofa": ("sofa_03", None),
     "coffee_table": ("modern_coffee_table_01", None),
-    "cafe_table": ("round_wooden_table_01", None),
     "manager_desk": ("metal_office_desk", None),
     "bookshelf": ("wooden_display_shelves_01", None),
     "clock": ("wall_clock", None),
     "fire_alarm": ("fire_alarm", None),
-    "microwave": ("vintage_microwave", None),
-    "stationery": ("stationery_supplies", None),
 }
 
 
@@ -425,6 +442,59 @@ def reception_desk(M):
     cyl(0.065, 0.07, (-0.25, -d / 2 + 0.1, 1.17), material("beans", (0.85, 0.25, 0.3), 0.4))
 
 
+def lounge_sofa(M):
+    """A modern three-seat office sofa: 2.2 × 0.85 m, seat at 0.45 m."""
+    w, d = 2.2, 0.85
+    box((w, d - 0.04, 0.2), (0, 0.02, 0.28), M["sofa_fabric"], bevel=0.02, segments=3)
+    for i in range(3):
+        cw = (w - 0.3) / 3
+        x = -w / 2 + 0.15 + cw * (i + 0.5)
+        box((cw - 0.01, d - 0.22, 0.13), (x, -0.07, 0.445), M["sofa_fabric"], bevel=0.04, segments=4)
+        box((cw - 0.01, 0.2, 0.4), (x, d / 2 - 0.14, 0.64), M["sofa_fabric"], bevel=0.05, segments=4, rot=(math.radians(-8), 0, 0))
+    for sx in (-1, 1):
+        box((0.15, d, 0.42), (sx * (w / 2 - 0.075), 0, 0.39), M["sofa_fabric"], bevel=0.035, segments=4)
+        for sy in (-1, 1):
+            cyl(0.018, 0.18, (sx * (w / 2 - 0.1), sy * (d / 2 - 0.08), 0.09), M["steel"], verts=12)
+
+
+def cafe_chair(M):
+    """Moulded seat on four oak legs; seat at 0.46 m, back towards +y (level -z)."""
+    white = material("chair_white", (0.9, 0.9, 0.88), 0.4)
+    box((0.44, 0.42, 0.035), (0, 0, 0.46), white, bevel=0.015, segments=3)
+    box((0.42, 0.03, 0.3), (0, 0.22, 0.68), white, bevel=0.014, segments=3, rot=(math.radians(-12), 0, 0))
+    for sx in (-1, 1):
+        box((0.02, 0.02, 0.25), (sx * 0.12, 0.2, 0.56), M["oak"], bevel=0.005)  # back struts
+        for sy in (-1, 1):
+            cyl(0.014, 0.46, (sx * 0.17, sy * 0.16, 0.225), M["oak"], verts=12, rot=(sy * math.radians(6), -sx * math.radians(6), 0))
+
+
+def conference_chair(M):
+    """Stacking chair of the hall: padded seat and back on a chrome frame."""
+    box((0.48, 0.46, 0.07), (0, 0, 0.46), M["seat_fabric"], bevel=0.025, segments=3)
+    box((0.46, 0.06, 0.4), (0, 0.22, 0.74), M["seat_fabric"], bevel=0.025, segments=3, rot=(math.radians(-6), 0, 0))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            cyl(0.011, 0.44, (sx * 0.21, sy * 0.19, 0.21), M["chrome"], verts=10)
+        box((0.022, 0.42, 0.022), (sx * 0.21, 0, 0.42), M["chrome"], bevel=0.008)
+        box((0.022, 0.022, 0.42), (sx * 0.2, 0.24, 0.66), M["chrome"], bevel=0.008)
+
+
+def cafe_table(M):
+    """Round cafe table, Ø 1.2 m, white top on a pedestal."""
+    cyl(0.6, 0.03, (0, 0, 0.745), material("table_white", (0.92, 0.92, 0.9), 0.35), verts=48, bevel=0.01)
+    cyl(0.04, 0.7, (0, 0, 0.38), M["black_plastic"], verts=16)
+    cyl(0.3, 0.03, (0, 0, 0.015), M["black_plastic"], verts=32, bevel=0.01)
+
+
+def microwave(M):
+    """A modern 0.5 × 0.3 × 0.38 m microwave; the door faces -y (the room)."""
+    box((0.5, 0.38, 0.3), (0, 0, 0.15), M["steel"], bevel=0.01, segments=2)
+    box((0.34, 0.01, 0.24), (-0.07, -0.19, 0.15), material("oven_glass", (0.03, 0.03, 0.035), 0.1), bevel=0.004)
+    box((0.1, 0.01, 0.24), (0.19, -0.19, 0.15), M["black_plastic"], bevel=0.004)
+    box((0.06, 0.012, 0.02), (0.19, -0.197, 0.24), material("lcd", (0.1, 0.35, 0.25), 0.2, emission=(0.1, 0.5, 0.3)), bevel=0)
+    box((0.02, 0.03, 0.18), (0.09, -0.2, 0.15), M["steel"], bevel=0.006)  # handle
+
+
 def ceiling_light(M):
     """A 1.2 × 0.6 m troffer, hanging from 0 down; the glowing face points down."""
     box((1.2, 0.6, 0.04), (0, 0, -0.02), M["white_plastic"], bevel=0.004)
@@ -446,6 +516,11 @@ MODELLED = {
     "counter": counter,
     "reception_desk": reception_desk,
     "ceiling_light": ceiling_light,
+    "lounge_sofa": lounge_sofa,
+    "cafe_chair": cafe_chair,
+    "conference_chair": conference_chair,
+    "cafe_table": cafe_table,
+    "microwave": microwave,
 }
 
 

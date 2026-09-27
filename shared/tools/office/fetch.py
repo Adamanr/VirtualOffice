@@ -12,9 +12,8 @@ API = "https://api.polyhaven.com/files/"
 UA = {"User-Agent": "VirtualOffice-asset-build"}
 
 MODELS = [
-    "sofa_03", "potted_plant_01", "potted_plant_02", "potted_plant_04", "modern_coffee_table_01",
-    "round_wooden_table_01", "metal_office_desk", "wooden_display_shelves_01", "wall_clock",
-    "fire_alarm", "vintage_microwave", "stationery_supplies",
+    "potted_plant_01", "potted_plant_02", "potted_plant_04", "modern_coffee_table_01",
+    "metal_office_desk", "wooden_display_shelves_01", "wall_clock", "fire_alarm",
 ]
 TEXTURES = [
     "dirty_carpet", "laminate_floor_02", "floor_tiles_06", "ceiling_interior", "painted_plaster_wall",

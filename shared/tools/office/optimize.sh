@@ -5,7 +5,7 @@
 #   shared/tools/office/optimize.sh client/public/office
 set -e
 cd "$1"
-SMALL=" fire_alarm succulent stationery clock coffee_machine trash_bin microwave "
+SMALL=" fire_alarm succulent clock coffee_machine trash_bin microwave "
 KEEP_MATERIALS=" vending_machine "
 for f in *.glb; do
   n=${f%.glb}

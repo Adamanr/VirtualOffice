@@ -690,7 +690,7 @@
   },
   {
    "type": "plant",
-   "position": [3.65, 14.3],
+   "position": [3.55, 14.25],
    "rotationY": 0
   },
   {
@@ -735,7 +735,7 @@
   },
   {
    "type": "filing_cabinet",
-   "position": [-19.68, 2.5],
+   "position": [-19.57, 2.5],
    "rotationY": 1.571
   },
   {
@@ -911,12 +911,12 @@
   },
   {
    "type": "filing_cabinet",
-   "position": [-9.68, -11.7],
+   "position": [-9.57, -11.7],
    "rotationY": 1.571
   },
   {
    "type": "filing_cabinet",
-   "position": [-9.68, -11.1],
+   "position": [-9.57, -11.1],
    "rotationY": 1.571
   },
   {

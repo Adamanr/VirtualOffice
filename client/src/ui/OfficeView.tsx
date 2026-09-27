@@ -78,7 +78,7 @@ export function OfficeView({ spaceId }: { spaceId: string }) {
 
   return (
     <div className={`office${inScreen ? ' in-screen' : ''}`}>
-      <Scene color={color} self={selfId ? <Nameplate id={selfId} /> : null}>
+      <Scene self={selfId ? <Nameplate id={selfId} /> : null}>
         <NetSync />
         <MediaSync />
         <Interactions />

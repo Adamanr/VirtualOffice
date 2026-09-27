@@ -24,7 +24,7 @@ function load(): Profile {
   const fallback: Profile = {
     name: '',
     color,
-    look: encodeLook(randomLook(undefined, color)),
+    look: encodeLook(randomLook()),
     micId: null,
     camId: null,
     speakerId: null,

@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from '@react-three/rapier'
 import type { KinematicCharacterController } from '@dimforge/rapier3d-compat'
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { Anim } from '@shared/protocol.gen'
 import { isDown } from '../input/keyboard'
@@ -15,8 +15,9 @@ import { useActivity } from '../store/activity'
 import { useScreens } from '../store/screens'
 import { Avatar } from './Avatar'
 
-const WALK_SPEED = 3
-const RUN_SPEED = 6
+// Close to the motion-captured clips (≈1.4 and ≈3.5 m/s) sped up a little: feet mostly stay planted.
+const WALK_SPEED = 2.2
+const RUN_SPEED = 5
 const GRAVITY = 20
 const CAPSULE_HALF = 0.5
 const CAPSULE_RADIUS = 0.35
@@ -29,10 +30,10 @@ function dampAngle(from: number, to: number, k: number) {
   return from + d * k
 }
 
-export function LocalPlayer({ color, children }: { color: string; children?: ReactNode }) {
+export function LocalPlayer({ children }: { children?: ReactNode }) {
   const encodedLook = useProfile((s) => s.look)
   const selfId = usePlayers((s) => s.selfId)
-  const look = useMemo(() => lookFor(selfId ?? 'me', encodedLook, color), [selfId, encodedLook, color])
+  const look = useMemo(() => lookFor(selfId ?? 'me', encodedLook), [selfId, encodedLook])
   const body = useRef<RapierRigidBody>(null)
   const visual = useRef<THREE.Group>(null)
   const controller = useRef<KinematicCharacterController | null>(null)
@@ -127,9 +128,12 @@ export function LocalPlayer({ color, children }: { color: string; children?: Rea
         <CapsuleCollider args={[CAPSULE_HALF, CAPSULE_RADIUS]} />
       </RigidBody>
       <group ref={visual}>
-        <Avatar id={selfId} look={look} getAnim={() => local.anim}>
-          {children}
-        </Avatar>
+        {/* The model streams in; until then only the nameplate shows. */}
+        <Suspense fallback={children}>
+          <Avatar id={selfId} look={look} getAnim={() => local.anim}>
+            {children}
+          </Avatar>
+        </Suspense>
       </group>
     </>
   )

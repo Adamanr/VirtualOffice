@@ -1,28 +1,10 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import * as THREE from 'three'
 import { Anim } from '@shared/protocol.gen'
 import { blockKeyboard } from '../input/keyboard'
-import {
-  BEARD_LABELS,
-  BEARDS,
-  BOTTOM_LABELS,
-  BOTTOMS,
-  CLOTH_COLORS,
-  decodeLook,
-  encodeLook,
-  GLASSES,
-  GLASSES_LABELS,
-  HAIR_COLORS,
-  HAIR_LABELS,
-  HAIR_STYLES,
-  randomLook,
-  SKIN_TONES,
-  TOP_LABELS,
-  TOPS,
-  type Look,
-} from '../lib/look'
+import { AVATARS, avatarPortrait, decodeLook, encodeLook, randomLook, type Look } from '../lib/look'
 import { sendLook } from '../net/session'
 import { useProfile } from '../store/profile'
 import { Avatar } from '../scene/Avatar'
@@ -37,7 +19,9 @@ function Turntable({ look, walking, drag, spin }: { look: Look; walking: boolean
   })
   return (
     <group ref={spin} rotation-y={0.5}>
-      <Avatar look={look} getAnim={() => (walking ? Anim.walk : Anim.idle)} />
+      <Suspense fallback={null}>
+        <Avatar look={look} getAnim={() => (walking ? Anim.walk : Anim.idle)} />
+      </Suspense>
       <mesh rotation-x={-Math.PI / 2} position-y={-0.001}>
         <circleGeometry args={[0.55, 40]} />
         <meshLambertMaterial color="#2a3140" />
@@ -55,7 +39,7 @@ function Preview({ look, walking }: { look: Look; walking: boolean }) {
       className="char-preview"
       dpr={[1, 2]}
       flat
-      camera={{ fov: 28, position: [0, 1.15, 3.3] }}
+      camera={{ fov: 30, position: [0, 1.05, 3.9] }}
       onCreated={({ camera }) => camera.lookAt(0, 0.92, 0)}
       onPointerDown={(e) => {
         drag.current = { x: e.clientX, rot: spin.current?.rotation.y ?? 0 }
@@ -73,35 +57,6 @@ function Preview({ look, walking }: { look: Look; walking: boolean }) {
   )
 }
 
-function Swatches({ colors, value, onChange, custom = true }: { colors: readonly string[]; value: string; onChange: (c: string) => void; custom?: boolean }) {
-  return (
-    <div className="swatches small">
-      {colors.map((c) => (
-        <button type="button" key={c} className={`swatch${value === c ? ' active' : ''}`} style={{ background: c }} onClick={() => onChange(c)} aria-label={c} />
-      ))}
-      {custom && (
-        <label className={`swatch custom${colors.includes(value) ? '' : ' active'}`} title="Свой цвет" style={colors.includes(value) ? undefined : { background: value }}>
-          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
-        </label>
-      )}
-    </div>
-  )
-}
-
-function Choice<T extends string>({ options, labels, value, onChange }: { options: readonly T[]; labels: Record<T, string>; value: T; onChange: (v: T) => void }) {
-  return (
-    <div className="chips">
-      {options.map((o) => (
-        <button type="button" key={o} className={`chip${o === value ? ' active' : ''}`} onClick={() => onChange(o)}>
-          {labels[o]}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-type Tab = 'face' | 'clothes' | 'body'
-
 /**
  * Character editor. Changes apply at once: saved in the profile and, inside
  * an office, shown to everyone (debounced `set_look`).
@@ -110,7 +65,6 @@ export function CharacterDialog({ onClose }: { onClose: () => void }) {
   const encoded = useProfile((s) => s.look)
   const update = useProfile((s) => s.update)
   const look = useMemo(() => decodeLook(encoded), [encoded])
-  const [tab, setTab] = useState<Tab>('face')
   const [walking, setWalking] = useState(false)
 
   // WASD, arrows on sliders etc. must not walk the character behind the dialog.
@@ -156,88 +110,27 @@ export function CharacterDialog({ onClose }: { onClose: () => void }) {
               <button type="button" className={`btn small${walking ? ' primary' : ''}`} onClick={() => setWalking((w) => !w)}>
                 {walking ? '⏸ Стоять' : '🚶 Походка'}
               </button>
-              <button type="button" className="btn small" onClick={() => set(randomLook(undefined, look.topColor))} title="Случайная внешность">
+              <button type="button" className="btn small" onClick={() => set(randomLook())} title="Случайная внешность">
                 🎲 Случайно
               </button>
             </div>
           </div>
           <div className="char-right">
-            <div className="tabs">
-              {(
-                [
-                  ['face', 'Лицо и волосы'],
-                  ['clothes', 'Одежда'],
-                  ['body', 'Фигура'],
-                ] as [Tab, string][]
-              ).map(([id, label]) => (
-                <button type="button" key={id} className={`tab${tab === id ? ' active' : ''}`} onClick={() => setTab(id)}>
-                  {label}
-                </button>
-              ))}
+            <div className="field">
+              <span>Кто вы в офисе</span>
+              <div className="people">
+                {AVATARS.map((a) => (
+                  <button type="button" key={a.id} className={`person${a.id === look.avatar ? ' active' : ''}`} onClick={() => set({ avatar: a.id })} title={a.label}>
+                    <img src={avatarPortrait(a.id)} alt="" loading="lazy" />
+                    <span>{a.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            {tab === 'face' && (
-              <>
-                <div className="field">
-                  <span>Кожа</span>
-                  <Swatches colors={SKIN_TONES} value={look.skin} onChange={(skin) => set({ skin })} />
-                </div>
-                <div className="field">
-                  <span>Причёска</span>
-                  <Choice options={HAIR_STYLES} labels={HAIR_LABELS} value={look.hair} onChange={(hair) => set({ hair })} />
-                </div>
-                <div className="field">
-                  <span>Цвет волос</span>
-                  <Swatches colors={HAIR_COLORS} value={look.hairColor} onChange={(hairColor) => set({ hairColor })} />
-                </div>
-                <div className="field">
-                  <span>Борода</span>
-                  <Choice options={BEARDS} labels={BEARD_LABELS} value={look.beard} onChange={(beard) => set({ beard })} />
-                </div>
-                <div className="field">
-                  <span>Очки</span>
-                  <Choice options={GLASSES} labels={GLASSES_LABELS} value={look.glasses} onChange={(glasses) => set({ glasses })} />
-                </div>
-              </>
-            )}
-            {tab === 'clothes' && (
-              <>
-                <div className="field">
-                  <span>Верх</span>
-                  <Choice options={TOPS} labels={TOP_LABELS} value={look.top} onChange={(top) => set({ top })} />
-                </div>
-                <div className="field">
-                  <span>{look.top === 'blazer' ? 'Пиджак' : 'Цвет'}</span>
-                  <Swatches colors={CLOTH_COLORS} value={look.topColor} onChange={(topColor) => set({ topColor })} />
-                </div>
-                {look.top !== 'shirt' && look.top !== 'tshirt' && (
-                  <div className="field">
-                    <span>{{ tie: 'Галстук', blazer: 'Рубашка', sweater: 'Воротник', blouse: 'Отделка' }[look.top as 'tie']}</span>
-                    <Swatches colors={CLOTH_COLORS} value={look.accentColor} onChange={(accentColor) => set({ accentColor })} />
-                  </div>
-                )}
-                <div className="field">
-                  <span>Низ</span>
-                  <Choice options={BOTTOMS} labels={BOTTOM_LABELS} value={look.bottom} onChange={(bottom) => set({ bottom })} />
-                  <Swatches colors={CLOTH_COLORS} value={look.bottomColor} onChange={(bottomColor) => set({ bottomColor })} />
-                </div>
-                <div className="field">
-                  <span>Обувь</span>
-                  <Swatches colors={['#1c1714', '#3b2619', '#6b4428', '#111317', '#ffffff', '#7a2e2e']} value={look.shoes} onChange={(shoes) => set({ shoes })} />
-                </div>
-              </>
-            )}
-            {tab === 'body' && (
-              <>
-                <label className="field">
-                  <span>Рост · {Math.round(175 * look.height)} см</span>
-                  <input type="range" min={0.9} max={1.1} step={0.01} value={look.height} onChange={(e) => set({ height: Number(e.target.value) })} />
-                </label>
-                <label className="field">
-                  <span>Телосложение</span>
-                  <input type="range" min={0.85} max={1.2} step={0.01} value={look.build} onChange={(e) => set({ build: Number(e.target.value) })} />
-                </label>
-              </>
-            )}
+            <label className="field">
+              <span>Рост · {Math.round(100 * look.height)}% от обычного</span>
+              <input type="range" min={0.9} max={1.1} step={0.01} value={look.height} onChange={(e) => set({ height: Number(e.target.value) })} />
+            </label>
           </div>
         </div>
         <button type="button" className="btn primary" onClick={onClose}>

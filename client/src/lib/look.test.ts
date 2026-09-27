@@ -1,34 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { decodeLook, DEFAULT_LOOK, encodeLook, lookFor, randomLook } from './look'
+import { AVATARS, decodeLook, DEFAULT_LOOK, encodeLook, lookFor, randomLook } from './look'
 
 describe('look', () => {
   it('round-trips through the wire format', () => {
-    const look = randomLook('player-1')
-    expect(decodeLook(encodeLook(look))).toEqual({ ...look, build: Math.round(look.build * 100) / 100, height: Math.round(look.height * 100) / 100 })
+    const look = { avatar: 'bf3', height: 1.04 }
+    expect(encodeLook(look)).toBe('2|bf3|104')
+    expect(decodeLook(encodeLook(look))).toEqual(look)
   })
 
-  it('keeps the wire format short and server-safe', () => {
-    const s = encodeLook(randomLook('x'))
-    expect(s.length).toBeLessThan(120)
-    expect(s).toMatch(/^[0-9a-z|]+$/)
+  it('keeps the wire format server-safe', () => {
+    for (const a of AVATARS) expect(encodeLook({ avatar: a.id, height: 1 })).toMatch(/^[0-9a-z|]+$/)
   })
 
-  it('falls back field by field on damaged input', () => {
-    const s = encodeLook(DEFAULT_LOOK).split('|')
-    s[2] = 'mullet'
-    s[3] = 'zzzzzz'
-    s[12] = '999'
-    const look = decodeLook(s.join('|'))
-    expect(look.hair).toBe(DEFAULT_LOOK.hair)
-    expect(look.hairColor).toBe(DEFAULT_LOOK.hairColor)
-    expect(look.build).toBe(1.2)
-    expect(decodeLook('garbage')).toEqual(DEFAULT_LOOK)
+  it('falls back on unknown people, old formats and garbage', () => {
+    expect(decodeLook('2|nobody|100')).toEqual(DEFAULT_LOOK)
+    expect(decodeLook('1|eec1a0|short|3b2619')).toEqual(DEFAULT_LOOK)
     expect(decodeLook(undefined)).toEqual(DEFAULT_LOOK)
+    expect(decodeLook('2|am1|999').height).toBe(1.1)
+    expect(decodeLook('2|am1|').height).toBe(DEFAULT_LOOK.height)
   })
 
-  it('derives the same figure from a player id on every client', () => {
-    expect(lookFor('abc', null, '#4f8cff')).toEqual(lookFor('abc', undefined, '#4f8cff'))
-    expect(lookFor('abc', null, '#4f8cff').topColor).toBe('#4f8cff')
-    expect(randomLook('abc')).not.toEqual(randomLook('abd'))
+  it('derives the same person from a player id on every client', () => {
+    expect(lookFor('abc', null)).toEqual(lookFor('abc', 'garbage'))
+    expect(AVATARS.some((a) => a.id === randomLook('abc').avatar)).toBe(true)
+    expect(new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((s) => randomLook(s).avatar)).size).toBeGreaterThan(2)
   })
 })

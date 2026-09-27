@@ -34,7 +34,7 @@ function World() {
   )
 }
 
-export function Scene({ color, self, children }: { color: string; self?: ReactNode; children?: ReactNode }) {
+export function Scene({ self, children }: { self?: ReactNode; children?: ReactNode }) {
   const debug = new URLSearchParams(location.search).has('debug')
   return (
     <Canvas
@@ -50,7 +50,7 @@ export function Scene({ color, self, children }: { color: string; self?: ReactNo
       <directionalLight position={[12, 20, 8]} intensity={1.4} />
       <Physics timeStep="vary">
         <World />
-        <LocalPlayer color={color}>{self}</LocalPlayer>
+        <LocalPlayer>{self}</LocalPlayer>
         <CameraRig />
         {children}
       </Physics>

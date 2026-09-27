@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { INTERP_DELAY_MS } from '../lib/interpolation'
 import { lookFor } from '../lib/look'
@@ -8,9 +8,9 @@ import { usePlayers } from '../store/players'
 import { Avatar } from './Avatar'
 import { Nameplate } from './Nameplate'
 
-function RemotePlayer({ id, color, encodedLook }: { id: string; color: string; encodedLook?: string }) {
+function RemotePlayer({ id, encodedLook }: { id: string; encodedLook?: string }) {
   const group = useRef<THREE.Group>(null)
-  const look = useMemo(() => lookFor(id, encodedLook, color), [id, encodedLook, color])
+  const look = useMemo(() => lookFor(id, encodedLook), [id, encodedLook])
 
   useFrame(() => {
     const g = group.current
@@ -29,9 +29,11 @@ function RemotePlayer({ id, color, encodedLook }: { id: string; color: string; e
 
   return (
     <group ref={group} visible={false}>
-      <Avatar id={id} look={look} getAnim={() => remotes.get(id)?.pose.anim ?? 0}>
-        <Nameplate id={id} />
-      </Avatar>
+      <Suspense fallback={<Nameplate id={id} />}>
+        <Avatar id={id} look={look} getAnim={() => remotes.get(id)?.pose.anim ?? 0}>
+          <Nameplate id={id} />
+        </Avatar>
+      </Suspense>
     </group>
   )
 }
@@ -44,7 +46,7 @@ export function RemotePlayers() {
       {Object.values(players)
         .filter((p) => p.id !== selfId)
         .map((p) => (
-          <RemotePlayer key={p.id} id={p.id} color={p.color} encodedLook={p.look} />
+          <RemotePlayer key={p.id} id={p.id} encodedLook={p.look} />
         ))}
     </>
   )

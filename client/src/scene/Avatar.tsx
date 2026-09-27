@@ -1,10 +1,11 @@
-import { useFrame } from '@react-three/fiber'
+import { createPortal, useFrame } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import * as THREE from 'three'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { Anim } from '@shared/protocol.gen'
-import type { Look } from '../lib/look'
+import { animsUrl, avatarInfo, avatarUrl, type Look } from '../lib/look'
 import { gestures, useActivity, type HeldItem } from '../store/activity'
-import { acquireBody, avatarMaterial, hipX, releaseBody, shoulderX, SKELETON } from './humanoid'
 
 interface AvatarProps {
   /** Player id: drives gestures and held items shared by everyone. */
@@ -15,26 +16,38 @@ interface AvatarProps {
   children?: ReactNode
 }
 
-type Joint = RefObject<THREE.Group | null>
+type Clip = 'idle' | 'walk' | 'run' | 'sit' | 'wave' | 'drink'
 
-/** Target joint angles for one frame (radians; x = swing forward/back, z = out to the side). */
-interface Pose {
-  legL: number
-  legR: number
-  kneeL: number
-  kneeR: number
-  armL: number
-  armR: number
-  armOutL: number
-  armOutR: number
-  elbowL: number
-  elbowR: number
-  spine: number
-  head: number
-  headTurn: number
+/** Playback speed so feet roughly match the ground speed (see LocalPlayer WALK/RUN_SPEED). */
+const TIME_SCALE: Record<Clip, number> = { idle: 1, walk: 1.55, run: 1.4, sit: 1, wave: 1.3, drink: 1 }
+/** Pelvis height (m) in the sitting clip; our seats put the hips at SEAT_HIPS. */
+const SIT_PELVIS = { m: 0.59, f: 0.61 }
+const SEAT_HIPS = 0.5
+
+/**
+ * The walk and run clips still carry their forward travel in the pelvis track:
+ * remove the linear trend so people walk in place (the game moves them), keeping
+ * the natural bob and sway. Done once per shared clip.
+ */
+const inPlace = new WeakSet<THREE.AnimationClip>()
+function makeInPlace(clip: THREE.AnimationClip) {
+  if (inPlace.has(clip)) return
+  inPlace.add(clip)
+  for (const track of clip.tracks) {
+    if (!track.name.endsWith('Pelvis.position')) continue
+    const { times, values } = track
+    const n = times.length
+    if (n < 2) continue
+    const t0 = times[0]!
+    const span = times[n - 1]! - t0
+    for (let c = 0; c < 3; c++) {
+      const first = values[c]!
+      const drift = values[(n - 1) * 3 + c]! - first
+      for (let i = 0; i < n; i++) values[i * 3 + c]! -= (drift * (times[i]! - t0)) / span
+    }
+  }
 }
-
-const rest = (): Pose => ({ legL: 0, legR: 0, kneeL: 0, kneeR: 0, armL: 0, armR: 0, armOutL: 0.1, armOutR: 0.1, elbowL: -0.1, elbowR: -0.1, spine: 0, head: 0, headTurn: 0 })
+const FADE = 0.25
 
 /** Is this player carrying something right now (a coffee, a snack…)? */
 const carrying = (id: string | null | undefined) => {
@@ -43,149 +56,114 @@ const carrying = (id: string | null | undefined) => {
 }
 
 /**
- * A low-poly office worker (see humanoid.ts) with procedural motion: walk and
- * run cycles, sitting, idle breathing, one-shot gestures from activities, and
- * a held item in the right hand.
+ * Materials of a loaded avatar, once per model: Lambert like the rest of the
+ * office (no environment map needed), hair and lashes alpha-tested.
+ */
+const prepared = new WeakSet<THREE.Object3D>()
+function prepare(scene: THREE.Object3D) {
+  if (prepared.has(scene)) return
+  prepared.add(scene)
+  scene.traverse((o) => {
+    const mesh = o as THREE.SkinnedMesh
+    if (!mesh.isMesh) return
+    const convert = (m: THREE.Material) => {
+      const std = m as THREE.MeshStandardMaterial
+      const lambert = new THREE.MeshLambertMaterial({ map: std.map, color: std.color, alphaTest: std.alphaTest, transparent: false, side: std.side })
+      lambert.name = std.name
+      m.dispose()
+      return lambert
+    }
+    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(convert) : convert(mesh.material)
+  })
+}
+
+/**
+ * A real person (Rocketbox model) with motion-captured idle / walk / run / sit
+ * clips cross-faded by the network `anim`, one-shot gestures from activities,
+ * and whatever they carry in the right hand.
  */
 export function Avatar({ id, look, getAnim, children }: AvatarProps) {
+  const info = avatarInfo(look.avatar)
+  const { scene } = useGLTF(avatarUrl(info.id))
+  const { animations } = useGLTF(animsUrl(info.gender))
   const figure = useRef<THREE.Group>(null)
-  const spine = useRef<THREE.Group>(null)
-  const neck = useRef<THREE.Group>(null)
-  const legL = useRef<THREE.Group>(null)
-  const legR = useRef<THREE.Group>(null)
-  const kneeL = useRef<THREE.Group>(null)
-  const kneeR = useRef<THREE.Group>(null)
-  const armL = useRef<THREE.Group>(null)
-  const armR = useRef<THREE.Group>(null)
-  const elbowL = useRef<THREE.Group>(null)
-  const elbowR = useRef<THREE.Group>(null)
-  // Random start phase so idle players don't breathe in sync.
-  const [initialPhase] = useState(() => Math.random() * 10)
-  const phase = useRef(initialPhase)
-  const walkBlend = useRef(0)
 
-  const { key, body } = useMemo(() => acquireBody(look), [look])
-  useEffect(() => () => releaseBody(key), [key])
+  const model = useMemo(() => {
+    prepare(scene)
+    const m = cloneSkinned(scene)
+    // Poses move vertices far from the bind-pose bounds (sitting, arms up).
+    m.traverse((o) => (o.frustumCulled = false))
+    return m
+  }, [scene])
+  const hand = useMemo(() => model.getObjectByName('Bip01_R_Hand') ?? null, [model])
+
+  const mixer = useMemo(() => new THREE.AnimationMixer(model), [model])
+  const actions = useMemo(() => {
+    const map = new Map<Clip, THREE.AnimationAction>()
+    for (const clip of animations) {
+      if (clip.name === 'walk' || clip.name === 'run') makeInPlace(clip)
+      const action = mixer.clipAction(clip)
+      action.timeScale = TIME_SCALE[clip.name as Clip] ?? 1
+      map.set(clip.name as Clip, action)
+    }
+    return map
+  }, [animations, mixer])
+  useEffect(() => () => void mixer.stopAllAction(), [mixer])
+
+  // Which clip plays on which mixer: a new model (another person) starts from scratch.
+  const current = useRef<{ mixer: THREE.AnimationMixer; clip: Clip } | null>(null)
+  // Random start phase so idle people don't breathe in sync.
+  const [offset] = useState(() => Math.random() * 10)
 
   useFrame((_, rawDt) => {
     const g = figure.current
     if (!g) return
     const dt = Math.min(rawDt, 0.05)
     const anim = getAnim()
-    const moving = anim === Anim.walk || anim === Anim.run
-    const run = anim === Anim.run
-    phase.current += dt * (run ? 11 : moving ? 7.5 : 1.6)
-    const t = phase.current
-    walkBlend.current += ((moving ? 1 : 0) - walkBlend.current) * (1 - Math.exp(-dt * 10))
-    const w = walkBlend.current
+    const gs = id ? gestures.get(id) : undefined
+    const k = gs ? (performance.now() - gs.start) / gs.duration : 1
+    if (gs && k >= 1) gestures.delete(id!)
 
-    const p = rest()
-    let y = 0
+    let want: Clip = anim === Anim.run ? 'run' : anim === Anim.walk ? 'walk' : anim === Anim.sit ? 'sit' : 'idle'
+    if (want === 'idle' && carrying(id)) want = 'drink'
+    if (k < 1 && (gs!.type === 'use' || gs!.type === 'throw') && want !== 'sit') want = 'wave'
+    const playing = current.current?.mixer === mixer ? current.current.clip : null
+    if (want !== playing) {
+      const next = actions.get(want)
+      const prev = playing ? actions.get(playing) : undefined
+      if (next) {
+        next.reset()
+        if (want === 'idle' || want === 'sit') next.time = offset % next.getClip().duration
+        next.setEffectiveWeight(1).play()
+        if (prev) prev.crossFadeTo(next, FADE, false)
+        current.current = { mixer, clip: want }
+      }
+    }
+    mixer.update(dt)
+
+    // Whole-body touches for the gestures that have no clip.
+    // The sitting clip sits on a taller chair than ours.
+    let y = anim === Anim.sit ? SEAT_HIPS - SIT_PELVIS[info.gender] * look.height : 0
     let tilt = 0
     let sway = 0
     let squash = 1
-    // Walk / run: legs swing, the knee bends on the way back, arms counter-swing.
-    const swing = Math.sin(t) * (run ? 0.75 : 0.5) * w
-    p.legL = swing
-    p.legR = -swing
-    p.kneeL = Math.max(0, Math.sin(t - 1.3)) * (run ? 1.3 : 0.75) * w
-    p.kneeR = Math.max(0, Math.sin(t + Math.PI - 1.3)) * (run ? 1.3 : 0.75) * w
-    p.armL = -swing * 0.8
-    p.armR = swing * 0.8
-    p.elbowL = p.elbowR = run ? -1.25 * w - 0.1 : -0.25 * w - 0.1
-    y = Math.abs(Math.cos(t)) * (run ? 0.07 : 0.035) * w - (run ? 0.04 : 0.015) * w
-    tilt = (run ? 0.16 : 0.04) * w
-    if (!moving) {
-      // Idle: breathing, a slow look around.
-      p.spine = Math.sin(t * 0.9) * 0.012
-      p.headTurn = Math.sin(t * 0.23) * 0.25 * (1 - w)
-    }
-    if (anim === Anim.sit) {
-      p.legL = p.legR = -Math.PI / 2 + 0.05
-      p.kneeL = p.kneeR = Math.PI / 2 - 0.05
-      p.armL = p.armR = -0.45
-      p.elbowL = p.elbowR = -0.7
-      p.armOutL = p.armOutR = 0.12
-      y = -SKELETON.hipY * look.height + 0.5
-      tilt = -0.04
-    }
-    if (carrying(id)) {
-      p.armR = -0.35
-      p.elbowR = -1.25
-    }
-
-    // One-shot gestures triggered by activities (seen by everyone).
-    const gs = id ? gestures.get(id) : undefined
-    if (gs) {
-      const k = (performance.now() - gs.start) / gs.duration
-      if (k >= 1) gestures.delete(id!)
-      else {
-        const s = Math.sin(k * Math.PI)
-        switch (gs.type) {
-          case 'use':
-            p.armR = -1.3 * s
-            p.elbowR = -0.3
-            tilt += 0.12 * s
-            break
-          case 'kick':
-            p.legR = -1.2 * Math.sin(k * Math.PI)
-            p.kneeR = 0.3 * (1 - s)
-            p.armL = 0.4 * s
-            tilt -= 0.15 * s
-            break
-          case 'hop':
-            y += 0.4 * Math.abs(Math.sin(k * Math.PI * 2))
-            p.armL = p.armR = -2.7 * s
-            p.armOutL = p.armOutR = 0.3 * s
-            p.kneeL = p.kneeR = 0.8 * Math.abs(Math.sin(k * Math.PI * 2))
-            break
-          case 'throw':
-            if (k < 0.4) {
-              p.armR = -2.8 * (k / 0.4)
-              p.elbowR = -1.5 * (k / 0.4)
-              tilt -= 0.12 * (k / 0.4)
-            } else {
-              const q = (k - 0.4) / 0.6
-              p.armR = -2.8 + 2.1 * Math.min(1, q * 1.6)
-              p.elbowR = -1.5 * (1 - q)
-              tilt += 0.25 * Math.sin(q * Math.PI)
-            }
-            break
-          case 'bonk':
-            sway += 0.3 * Math.sin(k * 30) * (1 - k)
-            squash = 1 - 0.15 * s
-            p.head = 0.4 * s
-            p.armOutL = p.armOutR = 0.6 * s
-            break
-          case 'shiver':
-            sway += 0.06 * Math.sin(k * 60)
-            p.armL = p.armR = -0.6
-            p.elbowL = p.elbowR = -1.9
-            p.armOutL = p.armOutR = -0.35
-            break
-        }
+    if (k < 1) {
+      const s = Math.sin(k * Math.PI)
+      switch (gs!.type) {
+        case 'kick':
+          tilt -= 0.25 * Math.sin(k * Math.PI * 2)
+          break
+        case 'hop':
+          y += 0.35 * Math.abs(Math.sin(k * Math.PI * 2))
+          break
+        case 'bonk':
+          sway += 0.25 * Math.sin(k * 30) * (1 - k)
+          squash = 1 - 0.12 * s
+          break
+        case 'shiver':
+          sway += 0.05 * Math.sin(k * 60)
+          break
       }
-    }
-
-    const kk = 1 - Math.exp(-dt * (gs ? 22 : 14))
-    const set = (j: Joint, x: number, z = 0) => {
-      const o = j.current
-      if (!o) return
-      o.rotation.x += (x - o.rotation.x) * kk
-      o.rotation.z += (z - o.rotation.z) * kk
-    }
-    set(legL, p.legL)
-    set(legR, p.legR)
-    set(kneeL, p.kneeL)
-    set(kneeR, p.kneeR)
-    set(armL, p.armL, -p.armOutL)
-    set(armR, p.armR, p.armOutR)
-    set(elbowL, p.elbowL)
-    set(elbowR, p.elbowR)
-    set(spine, p.spine)
-    if (neck.current) {
-      neck.current.rotation.x += (p.head - neck.current.rotation.x) * kk
-      neck.current.rotation.y += (p.headTurn - neck.current.rotation.y) * kk
     }
     const ks = 1 - Math.exp(-dt * 12)
     g.position.y += (y - g.position.y) * (anim === Anim.sit ? 1 : ks)
@@ -194,64 +172,53 @@ export function Avatar({ id, look, getAnim, children }: AvatarProps) {
     g.scale.y += (squash - g.scale.y) * 0.5
   })
 
-  const { hipY, thigh, shoulderY, neckY, upperArm } = SKELETON
-  const m = avatarMaterial
   return (
     <group>
       <group ref={figure}>
         <group scale={look.height}>
-          <group ref={legL} position={[-hipX(look), hipY, 0]}>
-            <mesh geometry={body.thighL} material={m} />
-            <group ref={kneeL} position-y={-thigh}>
-              <mesh geometry={body.shinL} material={m} />
-            </group>
-          </group>
-          <group ref={legR} position={[hipX(look), hipY, 0]}>
-            <mesh geometry={body.thighR} material={m} />
-            <group ref={kneeR} position-y={-thigh}>
-              <mesh geometry={body.shinR} material={m} />
-            </group>
-          </group>
-          <group ref={spine} position-y={hipY}>
-            <mesh geometry={body.torso} material={m} />
-            <group ref={neck} position-y={neckY}>
-              <mesh geometry={body.head} material={m} />
-            </group>
-            <group ref={armL} position={[-shoulderX(look), shoulderY, 0]}>
-              <mesh geometry={body.upperArmL} material={m} />
-              <group ref={elbowL} position-y={-upperArm}>
-                <mesh geometry={body.forearmL} material={m} />
-              </group>
-            </group>
-            <group ref={armR} position={[shoulderX(look), shoulderY, 0]}>
-              <mesh geometry={body.upperArmR} material={m} />
-              <group ref={elbowR} position-y={-upperArm}>
-                <mesh geometry={body.forearmR} material={m} />
-                {id && <Held id={id} />}
-              </group>
-            </group>
-          </group>
+          <primitive object={model} />
         </group>
+        {id && hand && createPortal(<Held id={id} upright={figure} />, hand)}
       </group>
       {children}
     </group>
   )
 }
 
+// The people used by default start loading with the office.
+useGLTF.preload(animsUrl('m'))
+useGLTF.preload(animsUrl('f'))
+
+/** Rocketbox skeletons are in centimetres (the armature is scaled by 0.01). */
+const HAND_SCALE = 100
+
 /** Whatever the player is carrying after an activity (coffee, snack, popcorn…). */
-function Held({ id }: { id: string }) {
+const _q = new THREE.Quaternion()
+
+function Held({ id, upright }: { id: string; upright: RefObject<THREE.Group | null> }) {
   const held = useActivity((s) => s.held[id])
+  const group = useRef<THREE.Group>(null)
   const [, force] = useState(0)
   useEffect(() => {
     if (!held) return
     const t = setTimeout(() => force((n) => n + 1), Math.max(0, held.until - Date.now()))
     return () => clearTimeout(t)
   }, [held])
+  // Follows the palm but stays upright (a cup doesn't tilt with the wrist bone's axes).
+  useFrame(() => {
+    const g = group.current
+    const hand = g?.parent
+    if (!g || !hand || !upright.current) return
+    hand.getWorldQuaternion(_q).invert()
+    g.quaternion.copy(_q.multiply(upright.current.getWorldQuaternion(new THREE.Quaternion())))
+  })
   if (!held || held.until < Date.now()) return null
-  // In the right hand; turned back upright against the bent arm (see the carry pose).
+  // Bones live in the model's centimetre space: undo that scale; the palm is ~8 cm down the hand.
   return (
-    <group position={[0, -0.3, 0.04]} rotation-x={1.6}>
-      <HeldMesh item={held.item} color={held.color} />
+    <group ref={group} scale={HAND_SCALE} position={[8, 0, 2]}>
+      <group position-y={-0.02}>
+        <HeldMesh item={held.item} color={held.color} />
+      </group>
     </group>
   )
 }
